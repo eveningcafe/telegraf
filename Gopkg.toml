@@ -131,6 +131,10 @@
   version = "0.3.4"
 
 [[constraint]]
+  branch = "master"
+  name = "github.com/gophercloud/gophercloud"
+
+[[constraint]]
   name = "github.com/prometheus/client_golang"
   version = "0.9.2"
 
