@@ -6,7 +6,9 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/hypervisors"
 	"github.com/influxdata/telegraf"
-    "github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/endpoints"
+	"github.com/influxdata/telegraf/plugins/inputs"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/client"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/endpoints"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/services"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/projects"
 	"log"
@@ -73,13 +75,7 @@ func (o *OpenStack) Description() string {
 // initialize performs any necessary initialization functions
 func (o *OpenStack) initialize() error {
 	// Authenticate against Keystone and get a token provider
-	provider, err := openstack.AuthenticatedClient(gophercloud.AuthOptions{
-		IdentityEndpoint: o.IdentityEndpoint,
-		DomainName:       o.Domain,
-		TenantName:       o.Project,
-		Username:         o.Username,
-		Password:         o.Password,
-	})
+	provider, err := client.InitClient(o.IdentityEndpoint, o.Domain, o.Project, o.Username, o.Password)
 	if err != nil {
 		return fmt.Errorf("Unable to authenticate OpenStack user: %v", err)
 	}
@@ -157,17 +153,16 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 		"storage pools": o.gatherStoragePools,
 	}
 	for resources, gatherer := range gatherers {
-		if err := gather(gatherer); err != nil {
-			log.Println("W!", plugin, "failed to get", resources, ":", err)
+		if gatherer == nil  {
+			log.Println("W!", plugin, "failed to get", resources, ":", gatherer)
 		}
 	}
 
 	// Accumulate statistics
 	accumulators := []func(telegraf.Accumulator){
 		o.accumulateIdentity,
-		o.accumulateHypervisors,
-		o.accumulateServers,
-		o.accumulateVolumes,
+		o.accumulateCompute,
+		o.accumulateNetwork,
 		o.accumulateStoragePools,
 	}
 	for _, accumulator := range accumulators {
@@ -175,4 +170,14 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	}
 
 	return nil
+}
+
+
+// init registers a callback which creates a new OpenStack input instance.
+func init() {
+	inputs.Add("openstack", func() telegraf.Input {
+		return &OpenStack{
+			Domain: "Default",
+		}
+	})
 }
