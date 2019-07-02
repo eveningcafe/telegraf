@@ -53,8 +53,8 @@ func (h *HTTP) Init() error {
 	return nil
 }
 
-
-func InitClient(identityEndpoint string, domain string, project string, username string, password string, tsl tls.ClientConfig) (*Client, error){
+// func InitClient(identityEndpoint string, domain string, project string, username string, password string, tsl tls.ClientConfig)
+func InitClient(identityEndpoint string, domain string, project string, username string, password string) (*Client, error){
 	header := make(map[string]string)
 	header["Content-Type"]= "application/json"
 
@@ -116,5 +116,7 @@ func InitClient(identityEndpoint string, domain string, project string, username
 }
 
 func main() {
+	InitClient("http://controller:5000/v3","default","admin","admin","Welcome123")
+
 
 }

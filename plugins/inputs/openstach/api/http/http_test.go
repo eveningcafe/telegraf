@@ -8,12 +8,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	plugin "github.com/influxdata/telegraf/plugins/inputs/http"
+	plugin "github.com/influxdata/telegraf/plugins/inputs/openstach/api/http"
 	"github.com/influxdata/telegraf/plugins/parsers"
 	"github.com/influxdata/telegraf/testutil"
 	"github.com/stretchr/testify/require"
 )
 
+
+func TestHTTP_func1(t *testing.T){
+
+
+}
 func TestHTTPwithJSONFormat(t *testing.T) {
 	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/endpoint" {
