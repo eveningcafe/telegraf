@@ -1,9 +1,9 @@
-package openstach_test
+package openstack_test
 
 import (
 	"testing"
 
-	plugin "github.com/influxdata/telegraf/plugins/inputs/openstach"
+	plugin "github.com/influxdata/telegraf/plugins/inputs/openstack"
 	"github.com/influxdata/telegraf/testutil"
 	"github.com/stretchr/testify/require"
 )
@@ -22,8 +22,7 @@ func TestOpenstackInReal(t *testing.T) {
 	plugin := &plugin.OpenStack{
 		IdentityEndpoint: "http://controller:5000/v3",
 		Project: "admin",
-		UserDomainID: "default",
-		ProjectDomainID: "default",
+		Domain: "default",
 		Password: "Welcome123",
 		Username: "admin",
 	}
@@ -32,6 +31,9 @@ func TestOpenstackInReal(t *testing.T) {
 
 	var acc testutil.Accumulator
 
+	//for i := 0; i < 10; i++ {
+	//	acc.GatherError(plugin.Gather)
+	//}
 	require.NoError(t, acc.GatherError(plugin.Gather))
 
 	require.Len(t, acc.Metrics, 1)
