@@ -1,39 +1,38 @@
-package services
+package groups
 
 
-type ListServiceRequest struct {
+type ListGroupRequest struct {
 }
 
-type ListServiceResponse struct {
+type ListGroupResponse struct {
 	Links struct {
-		Next     interface{} `json:"next"`
-		Previous interface{} `json:"previous"`
 		Self     string      `json:"self"`
+		Previous interface{} `json:"previous"`
+		Next     interface{} `json:"next"`
 	} `json:"links"`
-	Services []struct {
+	Groups []struct {
 		Description string `json:"description"`
-		Enabled     bool   `json:"enabled"`
+		DomainID    string `json:"domain_id"`
 		ID          string `json:"id"`
 		Links       struct {
 			Self string `json:"self"`
 		} `json:"links"`
 		Name string `json:"name"`
-		Type string `json:"type"`
-	} `json:"services"`
+	} `json:"groups"`
 }
 
-type ListServiceAPI struct {
+type ListGroupAPI struct {
 	Path     string
 	Method   string
 	Header   map[string]string
-	Request  ListServiceRequest
-	Response ListServiceResponse
+	Request  ListGroupRequest
+	Response ListGroupResponse
 }
 
 // https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
-func declareListService(token string) *ListServiceAPI{
-	a:= new(ListServiceAPI)
-	a.Path = "/services"
+func declareListGroup(token string) *ListGroupAPI{
+	a:= new(ListGroupAPI)
+	a.Path = "/groups"
 	a.Method = "GET"
 	a.Header = map[string]string{
 		"Content-Type": "application/json",
@@ -41,5 +40,3 @@ func declareListService(token string) *ListServiceAPI{
 	}
 	return a
 }
-
-

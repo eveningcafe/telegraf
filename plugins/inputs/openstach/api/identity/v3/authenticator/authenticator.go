@@ -53,37 +53,9 @@ func (p *ProviderClient) GetCatalog() {
 
 
 func AuthenticatedClient(options AuthOption) (*ProviderClient, error){
-	api := declareGETToken(options.Username,options.Password,options.Project_name,options.UserDomainId,options.ProjectDomainId)
-
-	//auth := map[string]interface{}{
-	//	"auth": map[string]interface{}{
-	//		"identity": map[string]interface{}{
-	//			"methods": []string{options.Method},
-	//			"password": map[string]interface{}{
-	//				"user": map[string]interface{}{
-	//					"name": options.Username,
-	//					"domain": map[string]interface{}{
-	//						"id": options.User_domain_id,
-	//					},
-	//					"password": options.Password,
-	//				},
-	//			},
-	//		},
-	//		"scope": map[string]interface{}{
-	//			"project": map[string]interface{}{
-	//				"domain": map[string]interface{}{
-	//					"id": options.Project_domain_id,
-	//				},
-	//				"name": options.Project_name,
-	//			},
-	//		},
-	//	},
-	//}
+	api := declareCreateToken(options.Username,options.Password,options.Project_name,options.UserDomainId,options.ProjectDomainId)
 
 	jsonBody, err := json.Marshal(api.Request)
-
-	//fmt.Println(string(jsonData))
-	//log.Fatalln(err)
 
 	if err != nil {
 		panic(err.Error())

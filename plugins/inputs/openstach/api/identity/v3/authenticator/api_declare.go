@@ -78,7 +78,7 @@ type CreateTokenAPI struct {
 	Response CreateTokenResponse
 }
 
-func declareGETToken(userName string, password string, project string, userDomainID string, projectDomainID string) *CreateTokenAPI {
+func declareCreateToken(userName string, password string, project string, userDomainID string, projectDomainID string) *CreateTokenAPI {
 	a := new(CreateTokenAPI)
 	a.Path = "/auth/tokens"
 	a.Method = "POST"

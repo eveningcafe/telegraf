@@ -1,31 +1,35 @@
-package services
+package projects
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3"
+	v3 "github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3"
 	"io/ioutil"
 	"net/http"
 )
-// Service represents an OpenStack Service.
-type Service struct {
-	// ID is the unique ID of the service.
-	ID string `json:"id"`
+// Project represents an OpenStack Identity Project.
+type Project struct {
+	// IsDomain indicates whether the project is a domain.
+	IsDomain bool `json:"is_domain"`
 
-	// Type is the type of the service.
-	Type string `json:"type"`
+	// DomainID is the domain ID the project belongs to.
+	DomainID string `json:"domain_id"`
 
-	// Enabled is whether or not the service is enabled.
+	// Enabled is whether or not the project is enabled.
 	Enabled bool `json:"enabled"`
 
-	// Links contains referencing links to the service.
-	Links struct{ Self string `json:"self"` }
+	// ID is the unique ID of the project.
+	ID string `json:"id"`
+
+	// Name is the name of the project.
+	Name string `json:"name"`
+
 }
 
-func List(client *v3.IdentityClient) ([]Service, error){
-	api := declareListService(client.Token)
+func List(client *v3.IdentityClient) ([]Project, error){
+	api := declareListProject(client.Token)
 
 	jsonBody, err := json.Marshal(api.Request)
 
@@ -58,15 +62,16 @@ func List(client *v3.IdentityClient) ([]Service, error){
 
 	err = json.Unmarshal([]byte(body), &api.Response)
 
-	services := []Service{}
-	for _,v := range api.Response.Services{
-		services = append(services, Service{
+	projects := []Project{}
+	for _,v := range api.Response.Projects{
+		projects = append(projects, Project{
 			ID: v.ID,
-			Type: v.Type,
 			Enabled: v.Enabled,
-			Links: v.Links,
+			IsDomain: v.IsDomain,
+			DomainID: v.DomainID,
+			Name: v.Name,
 		})
 	}
 
-	return services, err
+	return projects, err
 }

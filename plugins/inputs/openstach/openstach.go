@@ -5,11 +5,14 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/schedulerstats"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/hypervisors"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	identity "github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/authenticator"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/projects"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/regions"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/services"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/users"
 	"log"
 )
 
@@ -48,11 +51,15 @@ var sampleConfig = `
   ## Use TLS but skip chain & host verification
   # insecure_skip_verify = false
 `
+
 type tagMap map[string]string
 type fieldMap map[string]interface{}
-type serviceMap map[string]interface{}
+type serviceMap map[string]services.Service
+
 // projectMap maps a project id to a Project struct.
 type projectMap map[string]projects.Project
+type userMap map[string]users.User
+type regionMap map[string]regions.Region
 
 type hypervisorMap map[string]hypervisors.Hypervisor
 
@@ -67,7 +74,6 @@ type hypervisorMap map[string]hypervisors.Hypervisor
 
 // storagePoolMap maps a storage pool name to a StoragePool struct.
 type storagePoolMap map[string]schedulerstats.StoragePool
-
 
 // OpenStack is the main structure associated with a collection instance.
 type OpenStack struct {
@@ -87,6 +93,8 @@ type OpenStack struct {
 
 	// Locally cached resources
 	services     serviceMap
+	regions      regionMap
+	users        userMap
 	projects     projectMap
 	hypervisors  hypervisorMap
 	storagePools storagePoolMap
@@ -108,12 +116,12 @@ func (o *OpenStack) Description() string {
 func (o *OpenStack) initialize() error {
 	// Authenticate against Keystone and get a token provider
 	provider, err := authenticator.AuthenticatedClient(authenticator.AuthOption{
-		AuthURL:           o.IdentityEndpoint,
+		AuthURL:         o.IdentityEndpoint,
 		ProjectDomainId: o.ProjectDomainID,
 		UserDomainId:    o.UserDomainID,
-		Username:          o.Username,
-		Password:          o.Password,
-		Project_name:      o.Project,
+		Username:        o.Username,
+		Password:        o.Password,
+		Project_name:    o.Project,
 	})
 	if err != nil {
 		return fmt.Errorf("Unable to authenticate OpenStack user: %v", err)
@@ -121,9 +129,8 @@ func (o *OpenStack) initialize() error {
 
 	provider.GetCatalog()
 
-
 	// Create required clients and attach to the OpenStack struct
-	if o.identity, err = identity.NewIdentityV3(provider.Token,provider.Catalog); err != nil {
+	if o.identity, err = identity.NewIdentityV3(provider.Token, provider.Catalog); err != nil {
 		return fmt.Errorf("unable to create V3 identity client: %v", err)
 	}
 	//if o.compute, err = openstack.NewComputeV2(provider, gophercloud.EndpointOpts{}); err != nil {
@@ -136,11 +143,14 @@ func (o *OpenStack) initialize() error {
 	// Initialize resource maps and slices
 	o.services = serviceMap{}
 	o.projects = projectMap{}
+	o.users = userMap{}
+	o.regions = regionMap{}
 	o.hypervisors = hypervisorMap{}
 	o.storagePools = storagePoolMap{}
 
 	return nil
 }
+
 // gatherHypervisors collects hypervisors from the OpenStack API.
 func (o *OpenStack) gatherHypervisors() error {
 	page, err := hypervisors.List(o.compute).AllPages()
@@ -156,24 +166,51 @@ func (o *OpenStack) gatherHypervisors() error {
 	}
 	return nil
 }
+
 // gatherServices collects services from the OpenStack API.
 func (o *OpenStack) gatherServices() error {
-	page, err := services.List(o.identity, &services.ListOpts{}).AllPages()
+	services, err := services.List(o.identity)
 	if err != nil {
 		return fmt.Errorf("unable to list services: %v", err)
-	}
-	services, err := services.ExtractServices(page)
-	if err != nil {
-		return fmt.Errorf("unable to extract services")
 	}
 	for _, service := range services {
 		o.services[service.ID] = service
 	}
+
 	return nil
 }
 
-
 func (o *OpenStack) gatherProjects() error {
+	projects, err := projects.List(o.identity)
+	if err != nil {
+		return fmt.Errorf("unable to list project: %v", err)
+	}
+	for _, project := range projects {
+		o.projects[project.ID] = project
+	}
+
+	return nil
+}
+func (o *OpenStack) gatherUsers() error {
+	users, err := users.List(o.identity)
+	if err != nil {
+		return fmt.Errorf("unable to list user: %v", err)
+	}
+	for _, user := range users {
+		o.users[user.ID] = user
+	}
+
+	return nil
+}
+func (o *OpenStack) gatherRegions() error {
+	regions, err := regions.List(o.identity)
+	if err != nil {
+		return fmt.Errorf("unable to list region: %v", err)
+	}
+	for _, region := range regions {
+		o.regions[region.ID] = region
+	}
+
 	return nil
 }
 
@@ -200,14 +237,18 @@ func (o *OpenStack) accumulateCompute(acc telegraf.Accumulator) {
 
 // accumulateIdentity accumulates statistics from the identity service.
 func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
+
 	fields := fieldMap{
-		"projects": len(o.projects),
+		"num_projects": len(o.projects),
+		"num_servives": len(o.services),
+		"num_users":    len(o.users),
+		"num_region":  len(o.regions),
 	}
 	acc.AddFields("openstack_identity", fields, tagMap{})
 }
 
 //
-func (o *OpenStack) accumulateNetwork(acc telegraf.Accumulator){
+func (o *OpenStack) accumulateNetwork(acc telegraf.Accumulator) {
 
 }
 
@@ -225,7 +266,17 @@ func (o *OpenStack) accumulateStoragePools(acc telegraf.Accumulator) {
 	}
 
 }
-
+// gather is a wrapper around library calls out to gophercloud that catches
+// and recovers from panics.  Evidently if things like volumes don't exist
+// then it will go down in flames.
+func gather(f func() error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recovered from crash: %v", r)
+		}
+	}()
+	return f()
+}
 func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	// Perform any required set up
 	if err := o.initialize(); err != nil {
@@ -234,24 +285,27 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 
 	// Gather resources.  Note service harvesting must come first as the other
 	// gatherers are dependant on this information.
+
 	gatherers := map[string]func() error{
 		"services":      o.gatherServices,
 		"projects":      o.gatherProjects,
+		"users":         o.gatherUsers,
+		"regions":       o.gatherRegions,
 		"hypervisors":   o.gatherHypervisors,
 		"storage pools": o.gatherStoragePools,
 	}
+
 	for resources, gatherer := range gatherers {
-		if gatherer == nil  {
-			log.Println("W!", plugin, "failed to get", resources, ":")
+		if err := gather(gatherer); err != nil {
+			log.Println("W!", plugin, "failed to get", resources, ":", err)
 		}
 	}
-
 	// Accumulate statistics
 	accumulators := []func(telegraf.Accumulator){
 		o.accumulateIdentity,
-		o.accumulateCompute,
-		o.accumulateNetwork,
-		o.accumulateStoragePools,
+		//o.accumulateCompute,
+		//o.accumulateNetwork,
+		//o.accumulateStoragePools,
 	}
 	for _, accumulator := range accumulators {
 		accumulator(acc)
@@ -260,13 +314,11 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	return nil
 }
 
-
-
 // init registers a callback which creates a new OpenStack input instance.
 func init() {
 	inputs.Add("openstack", func() telegraf.Input {
 		return &OpenStack{
-			UserDomainID: "default",
+			UserDomainID:    "default",
 			ProjectDomainID: "default",
 		}
 	})
