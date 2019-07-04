@@ -13,6 +13,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/regions"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/services"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/users"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/groups"
 	"log"
 )
 
@@ -59,6 +60,7 @@ type serviceMap map[string]services.Service
 // projectMap maps a project id to a Project struct.
 type projectMap map[string]projects.Project
 type userMap map[string]users.User
+type groupMap map[string]groups.Group
 type regionMap map[string]regions.Region
 
 type hypervisorMap map[string]hypervisors.Hypervisor
@@ -95,6 +97,7 @@ type OpenStack struct {
 	services     serviceMap
 	regions      regionMap
 	users        userMap
+	groups       groupMap
 	projects     projectMap
 	hypervisors  hypervisorMap
 	storagePools storagePoolMap
@@ -144,6 +147,7 @@ func (o *OpenStack) initialize() error {
 	o.services = serviceMap{}
 	o.projects = projectMap{}
 	o.users = userMap{}
+	o.groups = groupMap{}
 	o.regions = regionMap{}
 	o.hypervisors = hypervisorMap{}
 	o.storagePools = storagePoolMap{}
@@ -242,7 +246,7 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 		"num_projects": len(o.projects),
 		"num_servives": len(o.services),
 		"num_users":    len(o.users),
-		"num_region":  len(o.regions),
+		"num_region":   len(o.regions),
 	}
 	acc.AddFields("openstack_identity", fields, tagMap{})
 }
