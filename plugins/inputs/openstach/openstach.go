@@ -131,7 +131,7 @@ func (o *OpenStack) initialize() error {
 	}
 
 	// Create required clients and attach to the OpenStack struct
-	if o.identity, err = identity.NewIdentityV3(provider.Token, provider.Catalog); err != nil {
+	if o.identity, err = identity.NewIdentityV3(*provider); err != nil {
 		return fmt.Errorf("unable to create V3 identity client: %v", err)
 	}
 	//if o.compute, err = openstack.NewComputeV2(provider, gophercloud.EndpointOpts{}); err != nil {

@@ -9,11 +9,11 @@ type IdentityClient struct {
 	Region      string
 }
 
-func NewIdentityV3(token string, catalog []authenticator.Catalog) (*IdentityClient, error){
+func NewIdentityV3(providerClient authenticator.ProviderClient) (*IdentityClient, error){
 	c := new(IdentityClient)
 	c.ServiceType = "identity"
-	c.Token = token
-	for _, ca := range catalog {
+	c.Token = providerClient.Token
+	for _, ca := range providerClient.Catalog {
 		if ca.Type==c.ServiceType {
 			for _,e :=range ca.Endpoints {
 				if e.Interface =="public"{
