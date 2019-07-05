@@ -1,5 +1,9 @@
 package services
 
+import (
+	"encoding/json"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+)
 
 type ListServiceRequest struct {
 }
@@ -31,15 +35,19 @@ type ListServiceAPI struct {
 }
 
 // https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
-func declareListService(token string) *ListServiceAPI{
-	a:= new(ListServiceAPI)
-	a.Path = "/services"
-	a.Method = "GET"
-	a.Header = map[string]string{
-		"Content-Type": "application/json",
-		"X-Auth-Token": token,
-	}
-	return a
+func declareListService(endpoint string, token string) (*base.OpenstackAPI, error) {
+	req := ListServiceRequest{}
+	jsonBody, err := json.Marshal(req)
+	return &base.OpenstackAPI{
+		Method:   "GET",
+		Endpoint: endpoint,
+		Path:     "/services",
+		HeaderRequest: map[string]string{
+			"Content-Type": "application/json",
+			"X-Auth-Token": token,
+		},
+		Request: jsonBody,
+	}, err
 }
 
 

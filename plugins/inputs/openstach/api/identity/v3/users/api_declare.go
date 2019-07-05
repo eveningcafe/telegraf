@@ -1,5 +1,10 @@
 package users
 
+import (
+	"encoding/json"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+)
+
 type ListUserResponse struct {
 	Links struct {
 		Next     interface{} `json:"next"`
@@ -29,14 +34,19 @@ type ListUserAPI struct {
 	Response ListUserResponse
 }
 
-// https://developer.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail
-func declareListUser(token string) *ListUserAPI {
-	a := new(ListUserAPI)
-	a.Path = "/users"
-	a.Method = "GET"
-	a.Header = map[string]string{
-		"Content-Type": "application/json",
-		"X-Auth-Token": token,
-	}
-	return a
+// https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
+func declareListUser(endpoint string, token string) (*base.OpenstackAPI, error) {
+	req := ListUserRequest{}
+	jsonBody, err := json.Marshal(req)
+	return &base.OpenstackAPI{
+		Method:   "GET",
+		Endpoint: endpoint,
+		Path:     "/users",
+		HeaderRequest: map[string]string{
+			"Content-Type": "application/json",
+			"X-Auth-Token": token,
+		},
+		Request: jsonBody,
+	}, err
 }
+

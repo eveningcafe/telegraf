@@ -1,5 +1,10 @@
 package regions
 
+import (
+	"encoding/json"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+)
+
 type ListRegionResponse struct {
 	Links struct {
 		Next     interface{} `json:"next"`
@@ -26,14 +31,18 @@ type ListRegionAPI struct {
 	Response ListRegionResponse
 }
 
-// https://developer.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail
-func declareListRegion(token string) *ListRegionAPI {
-	a := new(ListRegionAPI)
-	a.Path = "/regions"
-	a.Method = "GET"
-	a.Header = map[string]string{
-		"Content-Type": "application/json",
-		"X-Auth-Token": token,
-	}
-	return a
+// https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
+func declareListRegion(endpoint string, token string) (*base.OpenstackAPI, error) {
+	req := ListRegionRequest{}
+	jsonBody, err := json.Marshal(req)
+	return &base.OpenstackAPI{
+		Method:   "GET",
+		Endpoint: endpoint,
+		Path:     "/regions",
+		HeaderRequest: map[string]string{
+			"Content-Type": "application/json",
+			"X-Auth-Token": token,
+		},
+		Request: jsonBody,
+	}, err
 }

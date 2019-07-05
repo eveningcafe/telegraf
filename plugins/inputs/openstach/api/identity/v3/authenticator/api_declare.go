@@ -1,6 +1,10 @@
 package authenticator
 
-import "time"
+import (
+	"encoding/json"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+	"time"
+)
 
 type Catalog struct {
 	Endpoints []struct {
@@ -70,6 +74,8 @@ type CreateTokenResponse struct {
 	}
 }
 
+
+
 type CreateTokenAPI struct {
 	Path     string
 	Method   string
@@ -78,19 +84,23 @@ type CreateTokenAPI struct {
 	Response CreateTokenResponse
 }
 
-func declareCreateToken(userName string, password string, project string, userDomainID string, projectDomainID string) *CreateTokenAPI {
-	a := new(CreateTokenAPI)
-	a.Path = "/auth/tokens"
-	a.Method = "POST"
-	a.Header = map[string]string{
-		"Content-Type": "application/json",
-	}
-	a.Request = CreateTokenRequest{}
-	a.Request.Auth.Identity.Methods                  = []string{"password"}
-	a.Request.Auth.Identity.Password.User.Password   = password
-	a.Request.Auth.Identity.Password.User.Domain.ID  = userDomainID
-	a.Request.Auth.Identity.Password.User.Name       = userName
-	a.Request.Auth.Scope.Project.Name                = project
-	a.Request.Auth.Scope.Project.Domain.ID           = projectDomainID
-	return a
+// https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
+func declareCreateToken(endpoint string, userName string, password string, project string, userDomainID string, projectDomainID string) (*base.OpenstackAPI, error) {
+	req := CreateTokenRequest{}
+	req.Auth.Identity.Methods                  = []string{"password"}
+	req.Auth.Identity.Password.User.Password   = password
+	req.Auth.Identity.Password.User.Domain.ID  = userDomainID
+	req.Auth.Identity.Password.User.Name       = userName
+	req.Auth.Scope.Project.Name                = project
+	req.Auth.Scope.Project.Domain.ID           = projectDomainID
+	jsonBody, err := json.Marshal(req)
+	return &base.OpenstackAPI{
+		Method:   "POST",
+		Endpoint: endpoint,
+		Path:     "/auth/tokens",
+		HeaderRequest: map[string]string{
+			"Content-Type": "application/json",
+		},
+		Request: jsonBody,
+	}, err
 }

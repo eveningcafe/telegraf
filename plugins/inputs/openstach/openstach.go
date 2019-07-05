@@ -130,8 +130,6 @@ func (o *OpenStack) initialize() error {
 		return fmt.Errorf("Unable to authenticate OpenStack user: %v", err)
 	}
 
-	provider.GetCatalog()
-
 	// Create required clients and attach to the OpenStack struct
 	if o.identity, err = identity.NewIdentityV3(provider.Token, provider.Catalog); err != nil {
 		return fmt.Errorf("unable to create V3 identity client: %v", err)
@@ -217,6 +215,17 @@ func (o *OpenStack) gatherRegions() error {
 
 	return nil
 }
+func (o *OpenStack) gatherGroups() error {
+	groups, err := groups.List(o.identity)
+	if err != nil {
+		return fmt.Errorf("unable to list groups: %v", err)
+	}
+	for _, group := range groups {
+		o.groups[group.ID] = group
+	}
+
+	return nil
+}
 
 func (o *OpenStack) gatherStoragePools() error {
 	return nil
@@ -247,6 +256,7 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 		"num_servives": len(o.services),
 		"num_users":    len(o.users),
 		"num_region":   len(o.regions),
+		"num_group":    len(o.groups),
 	}
 	acc.AddFields("openstack_identity", fields, tagMap{})
 }
@@ -294,6 +304,7 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 		"services":      o.gatherServices,
 		"projects":      o.gatherProjects,
 		"users":         o.gatherUsers,
+		"group":         o.gatherGroups,
 		"regions":       o.gatherRegions,
 		"hypervisors":   o.gatherHypervisors,
 		"storage pools": o.gatherStoragePools,

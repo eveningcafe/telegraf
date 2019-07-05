@@ -1,5 +1,10 @@
 package projects
 
+import (
+	"encoding/json"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+)
+
 type ListProjectRequest struct {
 }
 
@@ -31,17 +36,20 @@ type ListProjectAPI struct {
 	Response ListProjectResponse
 }
 
-// https://developer.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail
-func declareListProject(token string) *ListProjectAPI{
-	a:= new(ListProjectAPI)
-	a.Path = "/projects"
-	a.Method = "GET"
-	a.Header = map[string]string{
-		"Content-Type": "application/json",
-		"X-Auth-Token": token,
-	}
-	return a
+// https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
+func declareListProject(endpoint string, token string) (*base.OpenstackAPI, error) {
+	req := ListProjectRequest{}
+	jsonBody, err := json.Marshal(req)
+	return &base.OpenstackAPI{
+		Method:   "GET",
+		Endpoint: endpoint,
+		Path:     "/projects",
+		HeaderRequest: map[string]string{
+			"Content-Type": "application/json",
+			"X-Auth-Token": token,
+		},
+		Request: jsonBody,
+	}, err
 }
-
 
 

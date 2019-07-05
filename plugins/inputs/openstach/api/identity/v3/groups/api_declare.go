@@ -1,5 +1,9 @@
 package groups
 
+import (
+	"encoding/json"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+)
 
 type ListGroupRequest struct {
 }
@@ -21,22 +25,21 @@ type ListGroupResponse struct {
 	} `json:"groups"`
 }
 
-type ListGroupAPI struct {
-	Path     string
-	Method   string
-	Header   map[string]string
-	Request  ListGroupRequest
-	Response ListGroupResponse
-}
 
 // https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
-func declareListGroup(token string) *ListGroupAPI{
-	a:= new(ListGroupAPI)
-	a.Path = "/groups"
-	a.Method = "GET"
-	a.Header = map[string]string{
-		"Content-Type": "application/json",
-		"X-Auth-Token": token,
-	}
-	return a
+func declareListGroup(endpoint string, token string) (*base.OpenstackAPI, error) {
+	req := ListGroupRequest{}
+	jsonBody, err := json.Marshal(req)
+	return &base.OpenstackAPI{
+		Method:   "GET",
+		Endpoint: endpoint,
+		Path:     "/groups",
+		HeaderRequest : map[string]string{
+			"Content-Type": "application/json",
+			"X-Auth-Token": token,
+		},
+		Request: jsonBody,
+	}, err
 }
+
+

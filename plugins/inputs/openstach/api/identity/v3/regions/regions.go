@@ -1,13 +1,8 @@
 package regions
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
 	v3 "github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3"
-	"io/ioutil"
-	"net/http"
 )
 
 type Region struct {
@@ -27,41 +22,12 @@ type Region struct {
 }
 
 func List(client *v3.IdentityClient) ([]Region, error) {
-	api := declareListRegion(client.Token)
-
-	jsonBody, err := json.Marshal(api.Request)
-
-	if err != nil {
-		panic(err.Error())
-	}
-
-	httpClient := &http.Client{}
-	request, err := http.NewRequest(api.Method, client.Endpoint+api.Path, bytes.NewBuffer(jsonBody))
-	for k, v := range api.Header {
-		request.Header.Add(k, v)
-	}
-	resp, err := httpClient.Do(request)
-	defer resp.Body.Close()
-
-	if err != nil {
-		panic(err.Error())
-	}
-	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
-		fmt.Println("List service successful ")
-	} else {
-		err := errors.New("List service respond status code " + string(resp.StatusCode))
-		panic(err.Error())
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	err = json.Unmarshal([]byte(body), &api.Response)
-
+	api, err := declareListRegion(client.Endpoint, client.Token)
+	err = api.DoReuest()
+	result := ListRegionResponse{}
+	err = json.Unmarshal([]byte(api.Response),&result)
 	regions := []Region{}
-	for _, v := range api.Response.Regions {
+	for _, v := range result.Regions {
 		regions = append(regions, Region{
 			ID:            v.ID,
 			Description:  v.Description,
@@ -71,3 +37,4 @@ func List(client *v3.IdentityClient) ([]Region, error) {
 
 	return regions, err
 }
+

@@ -1,13 +1,8 @@
 package projects
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
 	v3 "github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3"
-	"io/ioutil"
-	"net/http"
 )
 // Project represents an OpenStack Identity Project.
 type Project struct {
@@ -28,42 +23,14 @@ type Project struct {
 
 }
 
-func List(client *v3.IdentityClient) ([]Project, error){
-	api := declareListProject(client.Token)
 
-	jsonBody, err := json.Marshal(api.Request)
-
-	if err != nil {
-		panic(err.Error())
-	}
-
-	httpClient := &http.Client{}
-	request, err := http.NewRequest(api.Method, client.Endpoint+api.Path, bytes.NewBuffer(jsonBody))
-	for k, v := range api.Header {
-		request.Header.Add(k,v)
-	}
-	resp, err := httpClient.Do(request)
-	defer resp.Body.Close()
-
-	if err != nil {
-		panic(err.Error())
-	}
-	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
-		fmt.Println("List service successful ")
-	} else {
-		err := errors.New("List service respond status code "+ string(resp.StatusCode))
-		panic(err.Error())
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	err = json.Unmarshal([]byte(body), &api.Response)
-
+func List(client *v3.IdentityClient) ([]Project, error) {
+	api, err := declareListProject(client.Endpoint, client.Token)
+	err = api.DoReuest()
+	result := ListProjectResponse{}
+	err = json.Unmarshal([]byte(api.Response),&result)
 	projects := []Project{}
-	for _,v := range api.Response.Projects{
+	for _, v := range result.Projects {
 		projects = append(projects, Project{
 			ID: v.ID,
 			Enabled: v.Enabled,

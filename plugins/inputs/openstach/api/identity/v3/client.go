@@ -20,10 +20,8 @@ func NewIdentityV3(token string, catalog []authenticator.Catalog) (*IdentityClie
 					c.Endpoint = e.URL
 					c.Region = e.Region
 				}
-
 			}
 		}
 	}
-
 	return c, nil
 }
