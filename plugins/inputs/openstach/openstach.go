@@ -87,6 +87,7 @@ type OpenStack struct {
 	Username         string
 	Password         string
 	Services_gather  []string
+	Region           string
 
 	// Locally cached clients
 	identity *identity.IdentityClient
@@ -95,12 +96,12 @@ type OpenStack struct {
 
 	// Locally cached resources
 	services     serviceMap
-	regions      regionMap
 	users        userMap
 	groups       groupMap
 	projects     projectMap
 	hypervisors  hypervisorMap
 	storagePools storagePoolMap
+
 }
 
 // SampleConfig return a sample configuration file for auto-generation and
@@ -131,7 +132,7 @@ func (o *OpenStack) initialize() error {
 	}
 
 	// Create required clients and attach to the OpenStack struct
-	if o.identity, err = identity.NewIdentityV3(*provider); err != nil {
+	if o.identity, err = identity.NewIdentityV3(*provider,o.Region); err != nil {
 		return fmt.Errorf("unable to create V3 identity client: %v", err)
 	}
 	//if o.compute, err = openstack.NewComputeV2(provider, gophercloud.EndpointOpts{}); err != nil {
@@ -146,11 +147,10 @@ func (o *OpenStack) initialize() error {
 	o.projects = projectMap{}
 	o.users = userMap{}
 	o.groups = groupMap{}
-	o.regions = regionMap{}
 	o.hypervisors = hypervisorMap{}
 	o.storagePools = storagePoolMap{}
 
-	return nil
+	return err
 }
 
 // gatherHypervisors collects hypervisors from the OpenStack API.
@@ -166,7 +166,7 @@ func (o *OpenStack) gatherHypervisors() error {
 	for _, hypervisor := range hypervisors {
 		o.hypervisors[hypervisor.ID] = hypervisor
 	}
-	return nil
+	return err
 }
 
 // gatherServices collects services from the OpenStack API.
@@ -179,7 +179,7 @@ func (o *OpenStack) gatherServices() error {
 		o.services[service.ID] = service
 	}
 
-	return nil
+	return err
 }
 
 func (o *OpenStack) gatherProjects() error {
@@ -191,7 +191,7 @@ func (o *OpenStack) gatherProjects() error {
 		o.projects[project.ID] = project
 	}
 
-	return nil
+	return err
 }
 func (o *OpenStack) gatherUsers() error {
 	users, err := users.List(o.identity)
@@ -202,18 +202,7 @@ func (o *OpenStack) gatherUsers() error {
 		o.users[user.ID] = user
 	}
 
-	return nil
-}
-func (o *OpenStack) gatherRegions() error {
-	regions, err := regions.List(o.identity)
-	if err != nil {
-		return fmt.Errorf("unable to list region: %v", err)
-	}
-	for _, region := range regions {
-		o.regions[region.ID] = region
-	}
-
-	return nil
+	return err
 }
 func (o *OpenStack) gatherGroups() error {
 	groups, err := groups.List(o.identity)
@@ -224,7 +213,7 @@ func (o *OpenStack) gatherGroups() error {
 		o.groups[group.ID] = group
 	}
 
-	return nil
+	return err
 }
 
 func (o *OpenStack) gatherStoragePools() error {
@@ -255,7 +244,6 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 		"num_projects": len(o.projects),
 		"num_servives": len(o.services),
 		"num_users":    len(o.users),
-		"num_region":   len(o.regions),
 		"num_group":    len(o.groups),
 	}
 	acc.AddFields("openstack_identity", fields, tagMap{})
@@ -305,7 +293,6 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 		"projects":      o.gatherProjects,
 		"users":         o.gatherUsers,
 		"group":         o.gatherGroups,
-		"regions":       o.gatherRegions,
 		"hypervisors":   o.gatherHypervisors,
 		"storage pools": o.gatherStoragePools,
 	}
@@ -318,7 +305,7 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	// Accumulate statistics
 	accumulators := []func(telegraf.Accumulator){
 		o.accumulateIdentity,
-		//o.accumulateCompute,
+		o.accumulateCompute,
 		//o.accumulateNetwork,
 		//o.accumulateStoragePools,
 	}

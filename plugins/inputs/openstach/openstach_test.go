@@ -26,12 +26,10 @@ func TestOpenstackInReal(t *testing.T) {
 		ProjectDomainID: "default",
 		Password: "Welcome123",
 		Username: "admin",
+		Region: "RegionOne",
 	}
 	metricName := "metricName"
-
-
 	var acc testutil.Accumulator
-
 	require.NoError(t, acc.GatherError(plugin.Gather))
 
 	require.Len(t, acc.Metrics, 1)
