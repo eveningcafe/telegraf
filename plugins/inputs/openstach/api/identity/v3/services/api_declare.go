@@ -2,7 +2,7 @@ package services
 
 import (
 	"encoding/json"
-	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base/request"
 )
 
 type ListServiceRequest struct {
@@ -35,10 +35,10 @@ type ListServiceAPI struct {
 }
 
 // https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
-func declareListService(endpoint string, token string) (*base.OpenstackAPI, error) {
+func declareListService(endpoint string, token string) (*request.OpenstackAPI, error) {
 	req := ListServiceRequest{}
 	jsonBody, err := json.Marshal(req)
-	return &base.OpenstackAPI{
+	return &request.OpenstackAPI{
 		Method:   "GET",
 		Endpoint: endpoint,
 		Path:     "/services",

@@ -7,13 +7,14 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/hypervisors"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
+	compute "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2"
 	identity "github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/authenticator"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/groups"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/projects"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/regions"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/services"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/users"
-	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/groups"
 	"log"
 )
 
@@ -91,7 +92,7 @@ type OpenStack struct {
 
 	// Locally cached clients
 	identity *identity.IdentityClient
-	compute  *gophercloud.ServiceClient
+	compute  *compute.ComputeClient
 	volume   *gophercloud.ServiceClient
 
 	// Locally cached resources
@@ -155,18 +156,19 @@ func (o *OpenStack) initialize() error {
 
 // gatherHypervisors collects hypervisors from the OpenStack API.
 func (o *OpenStack) gatherHypervisors() error {
-	page, err := hypervisors.List(o.compute).AllPages()
-	if err != nil {
-		return fmt.Errorf("unable to list hypervisors: %v", err)
-	}
-	hypervisors, err := hypervisors.ExtractHypervisors(page)
-	if err != nil {
-		return fmt.Errorf("unable to extract hypervisors: %v", err)
-	}
-	for _, hypervisor := range hypervisors {
-		o.hypervisors[hypervisor.ID] = hypervisor
-	}
-	return err
+	//page, err := hypervisors.List(o.compute).AllPages()
+	//if err != nil {
+	//	return fmt.Errorf("unable to list hypervisors: %v", err)
+	//}
+	//hypervisors, err := hypervisors.ExtractHypervisors(page)
+	//if err != nil {
+	//	return fmt.Errorf("unable to extract hypervisors: %v", err)
+	//}
+	//for _, hypervisor := range hypervisors {
+	//	o.hypervisors[hypervisor.ID] = hypervisor
+	//}
+	//return err
+	return nil
 }
 
 // gatherServices collects services from the OpenStack API.

@@ -2,7 +2,7 @@ package projects
 
 import (
 	"encoding/json"
-	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base/request"
 )
 
 type ListProjectRequest struct {
@@ -37,10 +37,10 @@ type ListProjectAPI struct {
 }
 
 // https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
-func declareListProject(endpoint string, token string) (*base.OpenstackAPI, error) {
+func declareListProject(endpoint string, token string) (*request.OpenstackAPI, error) {
 	req := ListProjectRequest{}
 	jsonBody, err := json.Marshal(req)
-	return &base.OpenstackAPI{
+	return &request.OpenstackAPI{
 		Method:   "GET",
 		Endpoint: endpoint,
 		Path:     "/projects",

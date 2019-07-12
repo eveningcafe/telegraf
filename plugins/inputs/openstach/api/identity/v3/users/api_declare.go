@@ -2,7 +2,7 @@ package users
 
 import (
 	"encoding/json"
-	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base/request"
 )
 
 type ListUserResponse struct {
@@ -35,10 +35,10 @@ type ListUserAPI struct {
 }
 
 // https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
-func declareListUser(endpoint string, token string) (*base.OpenstackAPI, error) {
+func declareListUser(endpoint string, token string) (*request.OpenstackAPI, error) {
 	req := ListUserRequest{}
 	jsonBody, err := json.Marshal(req)
-	return &base.OpenstackAPI{
+	return &request.OpenstackAPI{
 		Method:   "GET",
 		Endpoint: endpoint,
 		Path:     "/users",

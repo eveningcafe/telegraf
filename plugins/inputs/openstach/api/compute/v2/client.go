@@ -1,6 +1,10 @@
 package v2
 
+import "github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
 
+type ComputeClient struct{
+	base.Client
+}
 // CPUInfo represents CPU information of the hypervisor.
 type CPUInfo struct {
 	Vendor   string   `json:"vendor"`
@@ -75,7 +79,7 @@ type Hypervisor struct {
 	RunningVMs int `json:"running_vms"`
 
 	// Service is the service this hypervisor represents.
-	Service Service `json:"service"`
+	//Service Service `json:"service"`
 
 	// VCPUs is the total number of vcpus on the hypervisor.
 	VCPUs int `json:"vcpus"`

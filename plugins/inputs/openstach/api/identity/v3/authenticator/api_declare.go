@@ -2,7 +2,7 @@ package authenticator
 
 import (
 	"encoding/json"
-	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base/request"
 	"time"
 )
 
@@ -85,7 +85,7 @@ type CreateTokenAPI struct {
 }
 
 // https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
-func declareCreateToken(endpoint string, userName string, password string, project string, userDomainID string, projectDomainID string) (*base.OpenstackAPI, error) {
+func declareCreateToken(endpoint string, userName string, password string, project string, userDomainID string, projectDomainID string) (*request.OpenstackAPI, error) {
 	req := CreateTokenRequest{}
 	req.Auth.Identity.Methods                  = []string{"password"}
 	req.Auth.Identity.Password.User.Password   = password
@@ -94,7 +94,7 @@ func declareCreateToken(endpoint string, userName string, password string, proje
 	req.Auth.Scope.Project.Name                = project
 	req.Auth.Scope.Project.Domain.ID           = projectDomainID
 	jsonBody, err := json.Marshal(req)
-	return &base.OpenstackAPI{
+	return &request.OpenstackAPI{
 		Method:   "POST",
 		Endpoint: endpoint,
 		Path:     "/auth/tokens",

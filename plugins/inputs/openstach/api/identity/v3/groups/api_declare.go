@@ -2,7 +2,7 @@ package groups
 
 import (
 	"encoding/json"
-	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base"
+	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/base/request"
 )
 
 type ListGroupRequest struct {
@@ -27,10 +27,10 @@ type ListGroupResponse struct {
 
 
 // https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
-func declareListGroup(endpoint string, token string) (*base.OpenstackAPI, error) {
+func declareListGroup(endpoint string, token string) (*request.OpenstackAPI, error) {
 	req := ListGroupRequest{}
 	jsonBody, err := json.Marshal(req)
-	return &base.OpenstackAPI{
+	return &request.OpenstackAPI{
 		Method:   "GET",
 		Endpoint: endpoint,
 		Path:     "/groups",
