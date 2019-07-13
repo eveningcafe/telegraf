@@ -15,6 +15,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/regions"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/services"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/users"
+	computeService "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2/services"
 	"log"
 )
 
@@ -224,6 +225,16 @@ func (o *OpenStack) gatherStoragePools() error {
 
 // accumulateHypervisors accumulates statistics from hypervisors.
 func (o *OpenStack) accumulateCompute(acc telegraf.Accumulator) {
+	agents, err := computeService.List(o.compute)
+	if err != nil {
+
+	}else {
+		fields := fieldMap{
+			"num_projects": len(agents),
+		}
+		acc.AddFields("openstack_compute", fields, tagMap{})
+	}
+
 	for _, hypervisor := range o.hypervisors {
 		tags := tagMap{
 			"name": hypervisor.HypervisorHostname,
