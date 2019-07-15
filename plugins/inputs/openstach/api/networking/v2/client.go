@@ -12,6 +12,6 @@ func NewNetworkClientV3(providerClient authenticator.ProviderClient, region stri
 	var err error
 	c := &NetworkClient{}
 	c.ServiceType = "network"
-	c.Client, err  = base.NewClient( providerClient , region )
+	c.Client, err  = base.NewClient( providerClient , region, c.ServiceType )
 	return c, err
 }

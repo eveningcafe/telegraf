@@ -2,20 +2,22 @@ package openstach
 
 import (
 	"fmt"
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/schedulerstats"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/hypervisors"
+	//"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/schedulerstats"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
+	blockstorage "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3"
+	blockstorageServices "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/services"
+	//blockstorageVolumes "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/volumes"
+	blockstorageScheduler "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/scheduler"
 	compute "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2"
+	computeHypervisors "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2/hypervisors"
+	computeServices "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2/services"
 	identity "github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/authenticator"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/groups"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/projects"
-	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/regions"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/services"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/users"
-	computeService "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2/services"
 	"log"
 )
 
@@ -63,9 +65,8 @@ type serviceMap map[string]services.Service
 type projectMap map[string]projects.Project
 type userMap map[string]users.User
 type groupMap map[string]groups.Group
-type regionMap map[string]regions.Region
 
-type hypervisorMap map[string]hypervisors.Hypervisor
+type hypervisorMap map[string]computeHypervisors.Hypervisor
 
 // volume is a structure used to unmarshal raw JSON from the API into.
 //type volume struct {
@@ -77,7 +78,7 @@ type hypervisorMap map[string]hypervisors.Hypervisor
 // type volumeMap map[string]volume
 
 // storagePoolMap maps a storage pool name to a StoragePool struct.
-type storagePoolMap map[string]schedulerstats.StoragePool
+type storagePoolMap map[string]blockstorageScheduler.StoragePool
 
 // OpenStack is the main structure associated with a collection instance.
 type OpenStack struct {
@@ -94,7 +95,7 @@ type OpenStack struct {
 	// Locally cached clients
 	identity *identity.IdentityClient
 	compute  *compute.ComputeClient
-	volume   *gophercloud.ServiceClient
+	volume   *blockstorage.VolumeClient
 
 	// Locally cached resources
 	services     serviceMap
@@ -103,7 +104,6 @@ type OpenStack struct {
 	projects     projectMap
 	hypervisors  hypervisorMap
 	storagePools storagePoolMap
-
 }
 
 // SampleConfig return a sample configuration file for auto-generation and
@@ -134,15 +134,15 @@ func (o *OpenStack) initialize() error {
 	}
 
 	// Create required clients and attach to the OpenStack struct
-	if o.identity, err = identity.NewIdentityV3(*provider,o.Region); err != nil {
+	if o.identity, err = identity.NewIdentityV3(*provider, o.Region); err != nil {
 		return fmt.Errorf("unable to create V3 identity client: %v", err)
 	}
-	//if o.compute, err = openstack.NewComputeV2(provider, gophercloud.EndpointOpts{}); err != nil {
-	//	return fmt.Errorf("unable to create V2 compute client: %v", err)
-	//}
-	//if o.volume, err = openstack.NewBlockStorageV3(provider, gophercloud.EndpointOpts{}); err != nil {
-	//	return fmt.Errorf("unable to create V3 block storage client: %v", err)
-	//}
+	if o.compute, err = compute.NewComputeV2(*provider, o.Region); err != nil {
+		return fmt.Errorf("unable to create V2 compute client: %v", err)
+	}
+	if o.volume, err = blockstorage.NewBlockStorageV3(*provider, o.Region); err != nil {
+		return fmt.Errorf("unable to create V3 block storage client: %v", err)
+	}
 
 	// Initialize resource maps and slices
 	o.services = serviceMap{}
@@ -157,17 +157,13 @@ func (o *OpenStack) initialize() error {
 
 // gatherHypervisors collects hypervisors from the OpenStack API.
 func (o *OpenStack) gatherHypervisors() error {
-	//page, err := hypervisors.List(o.compute).AllPages()
-	//if err != nil {
-	//	return fmt.Errorf("unable to list hypervisors: %v", err)
-	//}
-	//hypervisors, err := hypervisors.ExtractHypervisors(page)
-	//if err != nil {
-	//	return fmt.Errorf("unable to extract hypervisors: %v", err)
-	//}
-	//for _, hypervisor := range hypervisors {
-	//	o.hypervisors[hypervisor.ID] = hypervisor
-	//}
+	hypervisors, err := computeHypervisors.List(o.compute)
+	if err != nil {
+		return fmt.Errorf("unable to extract hypervisors: %v", err)
+	}
+	for _, hypervisor := range hypervisors {
+		o.hypervisors[hypervisor.ID] = hypervisor
+	}
 	//return err
 	return nil
 }
@@ -207,6 +203,7 @@ func (o *OpenStack) gatherUsers() error {
 
 	return err
 }
+
 func (o *OpenStack) gatherGroups() error {
 	groups, err := groups.List(o.identity)
 	if err != nil {
@@ -220,33 +217,59 @@ func (o *OpenStack) gatherGroups() error {
 }
 
 func (o *OpenStack) gatherStoragePools() error {
+	//storagePools, err := blockstorageScheduler.ListPool(o.volume)
+	//if err != nil {
+	//	return fmt.Errorf("unable to list storage pools: %v", err)
+	//}
+	//for _, storagePool := range storagePools {
+	//	o.storagePools[storagePool.Name] = storagePool
+	//}
+	//return err
+
 	return nil
 }
 
-// accumulateHypervisors accumulates statistics from hypervisors.
-func (o *OpenStack) accumulateCompute(acc telegraf.Accumulator) {
-	agents, err := computeService.List(o.compute)
+//
+func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
+	agents, err := computeServices.List(o.compute)
 	if err != nil {
 
-	}else {
-		fields := fieldMap{
-			"num_projects": len(agents),
+	} else {
+		fields := fieldMap{}
+		for _, agent := range agents {
+			if agent.State == "up" {
+				fields["agent_state"] = 1
+			} else {
+				fields["agent_state"] = 0
+			}
+			acc.AddFields("openstack_compute", fields, tagMap{
+				"region":   o.Region,
+				"service":  agent.Binary,
+				"hostname": agent.Host,
+				"status":   agent.Status,
+				"zone":     agent.Zone,
+			})
 		}
-		acc.AddFields("openstack_compute", fields, tagMap{})
 	}
+}
+
+// accumulateHypervisors accumulates statistics from hypervisors.
+func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
 
 	for _, hypervisor := range o.hypervisors {
-		tags := tagMap{
-			"name": hypervisor.HypervisorHostname,
-		}
 		fields := fieldMap{
-			"memory_mb":      hypervisor.MemoryMB,
-			"memory_mb_used": hypervisor.MemoryMBUsed,
-			"running_vms":    hypervisor.RunningVMs,
-			"vcpus":          hypervisor.VCPUs,
-			"vcpus_used":     hypervisor.VCPUsUsed,
+			"memory_mb_total":     hypervisor.MemoryMB,
+			"memory_mb_used":      hypervisor.MemoryMBUsed,
+			"running_vms":         hypervisor.RunningVMs,
+			"vcpus_total":         hypervisor.VCPUs,
+			"vcpus_used":          hypervisor.VCPUsUsed,
+			"local_disk_avalable": hypervisor.LocalGB,
+			"local_disk_usage":    hypervisor.LocalGBUsed,
 		}
-		acc.AddFields("openstack_compute", fields, tags)
+		acc.AddFields("openstack_compute", fields, tagMap{
+			"name":   hypervisor.HypervisorHostname,
+			"region": o.Region,
+		})
 	}
 }
 
@@ -266,9 +289,59 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 func (o *OpenStack) accumulateNetwork(acc telegraf.Accumulator) {
 
 }
+//
+func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
+	agents, err := blockstorageServices.List(o.volume)
+	if err != nil {
+
+	} else {
+		fields := fieldMap{}
+		for _, agent := range agents {
+			if agent.State == "up" {
+				fields["agent_state"] = 1
+			} else {
+				fields["agent_state"] = 0
+			}
+			acc.AddFields("openstack_compute", fields, tagMap{
+				"region":   o.Region,
+				"service":  agent.Binary,
+				"hostname": agent.Host,
+				"status":   agent.Status,
+				"zone":     agent.Zone,
+			})
+		}
+	}
+}
+
+func (o *OpenStack) accumulateVolumesTenant(acc telegraf.Accumulator) {
+	//for _, volume := range o.volumes {
+	//	// Give empty types some form of field key
+	//	volumeType := "unknown"
+	//	if len(volume.VolumeType) != 0 {
+	//		volumeType = volume.VolumeType
+	//	}
+	//
+	//	// Try derive the associated project
+	//	project := "unknown"
+	//	if p, ok := o.projects[volume.TenantID]; ok {
+	//		project = p.Name
+	//	}
+	//
+	//	tags := tagMap{
+	//		"name":    volume.Name,
+	//		"project": project,
+	//		"type":    volumeType,
+	//	}
+	//	fields := fieldMap{
+	//		"size_gb": volume.Size,
+	//	}
+	//	acc.AddFields("openstack_volume", fields, tags)
+	//}
+}
 
 // accumulateStoragePools accumulates statistics about storage pools.
 func (o *OpenStack) accumulateStoragePools(acc telegraf.Accumulator) {
+
 	for _, storagePool := range o.storagePools {
 		tags := tagMap{
 			"name": storagePool.Capabilities.VolumeBackendName,
@@ -281,6 +354,7 @@ func (o *OpenStack) accumulateStoragePools(acc telegraf.Accumulator) {
 	}
 
 }
+
 // gather is a wrapper around library calls out to gophercloud that catches
 // and recovers from panics.  Evidently if things like volumes don't exist
 // then it will go down in flames.
@@ -318,11 +392,15 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	// Accumulate statistics
 	accumulators := []func(telegraf.Accumulator){
 		o.accumulateIdentity,
-		o.accumulateCompute,
+		o.accumulateComputeAgents,
+		o.accumulateComputeHypervisors,
 		//o.accumulateNetwork,
-		//o.accumulateStoragePools,
+		o.accumulateVolumeAgents,
+		o.accumulateStoragePools,
+		o.accumulateVolumesTenant,
 	}
 	for _, accumulator := range accumulators {
+		//go routine in here
 		accumulator(acc)
 	}
 

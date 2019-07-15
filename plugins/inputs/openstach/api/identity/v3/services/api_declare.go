@@ -26,13 +26,6 @@ type ListServiceResponse struct {
 	} `json:"services"`
 }
 
-type ListServiceAPI struct {
-	Path     string
-	Method   string
-	Header   map[string]string
-	Request  ListServiceRequest
-	Response ListServiceResponse
-}
 
 // https://developer.openstack.org/api-ref/identity/v3/?expanded=list-services-detail#list-services
 func declareListService(endpoint string, token string) (*request.OpenstackAPI, error) {

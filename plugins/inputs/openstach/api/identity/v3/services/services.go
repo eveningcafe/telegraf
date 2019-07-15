@@ -25,9 +25,9 @@ func List(client *v3.IdentityClient) ([]Service, error) {
 	err = api.DoReuest()
 	result := ListServiceResponse{}
 	err = json.Unmarshal([]byte(api.Response),&result)
-	users := []Service{}
+	services := []Service{}
 	for _, v := range result.Services {
-		users = append(users, Service{
+		services = append(services, Service{
 			ID: v.ID,
 			Type: v.Type,
 			Enabled: v.Enabled,
@@ -35,5 +35,5 @@ func List(client *v3.IdentityClient) ([]Service, error) {
 		})
 	}
 
-	return users, err
+	return services, err
 }

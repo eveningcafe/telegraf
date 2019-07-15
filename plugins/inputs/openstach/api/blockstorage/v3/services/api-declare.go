@@ -10,15 +10,17 @@ type ListServiceRequest struct {
 
 type ListServiceResponse struct {
 	Services []struct {
-		ID             int    `json:"id"`
-		Binary         string `json:"binary"`
-		DisabledReason string `json:"disabled_reason"`
-		Host           string `json:"host"`
-		State          string `json:"state"`
-		Status         string `json:"status"`
-		UpdatedAt      string `json:"updated_at"`
-		ForcedDown     bool   `json:"forced_down"`
-		Zone           string `json:"zone"`
+		Status            string      `json:"status"`
+		Binary            string      `json:"binary"`
+		Zone              string      `json:"zone"`
+		State             string      `json:"state"`
+		UpdatedAt         string      `json:"updated_at"`
+		Host              string      `json:"host"`
+		DisabledReason    interface{} `json:"disabled_reason"`
+		Frozen            bool        `json:"frozen,omitempty"`
+		Cluster           interface{} `json:"cluster,omitempty"`
+		ReplicationStatus string      `json:"replication_status,omitempty"`
+		ActiveBackendID   interface{} `json:"active_backend_id,omitempty"`
 	} `json:"services"`
 }
 
