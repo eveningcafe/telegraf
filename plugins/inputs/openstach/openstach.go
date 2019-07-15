@@ -302,7 +302,7 @@ func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 			} else {
 				fields["agent_state"] = 0
 			}
-			acc.AddFields("openstack_compute", fields, tagMap{
+			acc.AddFields("openstack_volumes", fields, tagMap{
 				"region":   o.Region,
 				"service":  agent.Binary,
 				"hostname": agent.Host,

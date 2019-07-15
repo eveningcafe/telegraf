@@ -102,5 +102,6 @@ func declareCreateToken(endpoint string, userName string, password string, proje
 			"Content-Type": "application/json",
 		},
 		Request: jsonBody,
+		RequestBodyRequire: true,
 	}, err
 }

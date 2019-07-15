@@ -19,12 +19,19 @@ type OpenstackAPI struct {
 	HeaderRequest   map[string]string
 	HeaderResponse  map[string][]string
 	Request  []byte
+	RequestBodyRequire bool // default no requestbody
 	Response []byte
 }
 // change Response arr of openstack,
 func (o *OpenstackAPI) DoReuest() (error) {
+	var request *http.Request
+	var err error
 	httpClient := &http.Client{}
-	request, err := http.NewRequest(o.Method, o.Endpoint+o.Path, bytes.NewBuffer(o.Request))
+	if(o.RequestBodyRequire == true){
+		request, err = http.NewRequest(o.Method, o.Endpoint+o.Path, bytes.NewBuffer(o.Request))
+	}else{
+		request, err = http.NewRequest(o.Method, o.Endpoint+o.Path, nil)
+	}
 	for k, v := range o.HeaderRequest {
 		request.Header.Add(k,v)
 	}
