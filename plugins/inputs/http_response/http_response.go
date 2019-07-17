@@ -57,13 +57,13 @@ var sampleConfig = `
   ## Set response_timeout (default 5 seconds)
   # response_timeout = "5s"
 
-  ## HTTP Request Method
+  ## HTTP RequestBody Method
   # method = "GET"
 
   ## Whether to follow redirects from the server (defaults to false)
   # follow_redirects = false
 
-  ## Optional HTTP Request Body
+  ## Optional HTTP RequestBody Body
   # body = '''
   # {'fake':'data'}
   # '''
@@ -80,7 +80,7 @@ var sampleConfig = `
   ## Use TLS but skip chain & host verification
   # insecure_skip_verify = false
 
-  ## HTTP Request Headers (all values must be strings)
+  ## HTTP RequestBody Headers (all values must be strings)
   # [inputs.http_response.headers]
   #   Host = "github.com"
 
@@ -286,7 +286,7 @@ func (h *HTTPResponse) httpGather(u string) (map[string]interface{}, map[string]
 
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Printf("D! Failed to read body of HTTP Response : %s", err)
+			log.Printf("D! Failed to read body of HTTP ResponseBody : %s", err)
 			setResult("body_read_error", fields, tags)
 			fields["response_string_match"] = 0
 			return fields, tags, nil

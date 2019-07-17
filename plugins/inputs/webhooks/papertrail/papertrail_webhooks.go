@@ -29,14 +29,14 @@ func (pt *PapertrailWebhook) eventHandler(w http.ResponseWriter, r *http.Request
 
 	data := r.PostFormValue("payload")
 	if data == "" {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		http.Error(w, "Bad RequestBody", http.StatusBadRequest)
 		return
 	}
 
 	var payload Payload
 	err := json.Unmarshal([]byte(data), &payload)
 	if err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		http.Error(w, "Bad RequestBody", http.StatusBadRequest)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (pt *PapertrailWebhook) eventHandler(w http.ResponseWriter, r *http.Request
 			}
 		}
 	} else {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		http.Error(w, "Bad RequestBody", http.StatusBadRequest)
 		return
 	}
 

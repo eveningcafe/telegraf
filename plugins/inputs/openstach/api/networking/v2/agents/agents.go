@@ -20,7 +20,7 @@ func List(client *v2.NetworkClient) ([]Agent, error) {
 	api, err := declareListAgent(client.Endpoint, client.Token)
 	err = api.DoReuest()
 	result := ListAgentResponse{}
-	err = json.Unmarshal([]byte(api.Response),&result)
+	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	agents := []Agent{}
 	for _, v := range result.Agents {
 		agents = append(agents, Agent{

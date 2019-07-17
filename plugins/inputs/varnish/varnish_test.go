@@ -193,10 +193,10 @@ MAIN.s_pipe                        0         0.00 Total pipe sessions seen
 MAIN.s_pass                        0         0.00 Total pass-ed requests seen
 MAIN.s_fetch                       0         0.00 Total backend fetches initiated
 MAIN.s_synth                       0         0.00 Total synthethic responses made
-MAIN.s_req_hdrbytes                0         0.00 Request header bytes
-MAIN.s_req_bodybytes               0         0.00 Request body bytes
-MAIN.s_resp_hdrbytes               0         0.00 Response header bytes
-MAIN.s_resp_bodybytes              0         0.00 Response body bytes
+MAIN.s_req_hdrbytes                0         0.00 RequestBody header bytes
+MAIN.s_req_bodybytes               0         0.00 RequestBody body bytes
+MAIN.s_resp_hdrbytes               0         0.00 ResponseBody header bytes
+MAIN.s_resp_bodybytes              0         0.00 ResponseBody body bytes
 MAIN.s_pipe_hdrbytes               0         0.00 Pipe request header bytes
 MAIN.s_pipe_in                     0         0.00 Piped bytes from client
 MAIN.s_pipe_out                    0         0.00 Piped bytes to client
@@ -340,10 +340,10 @@ SMA.Transient.g_bytes                        0          .   Bytes outstanding
 SMA.Transient.g_space                        0          .   Bytes available
 VBE.default(127.0.0.1,,8080).vcls            1          .   VCL references
 VBE.default(127.0.0.1,,8080).happy            0          .   Happy health probes
-VBE.default(127.0.0.1,,8080).bereq_hdrbytes            0         0.00 Request header bytes
-VBE.default(127.0.0.1,,8080).bereq_bodybytes            0         0.00 Request body bytes
-VBE.default(127.0.0.1,,8080).beresp_hdrbytes            0         0.00 Response header bytes
-VBE.default(127.0.0.1,,8080).beresp_bodybytes            0         0.00 Response body bytes
+VBE.default(127.0.0.1,,8080).bereq_hdrbytes            0         0.00 RequestBody header bytes
+VBE.default(127.0.0.1,,8080).bereq_bodybytes            0         0.00 RequestBody body bytes
+VBE.default(127.0.0.1,,8080).beresp_hdrbytes            0         0.00 ResponseBody header bytes
+VBE.default(127.0.0.1,,8080).beresp_bodybytes            0         0.00 ResponseBody body bytes
 VBE.default(127.0.0.1,,8080).pipe_hdrbytes               0         0.00 Pipe request header bytes
 VBE.default(127.0.0.1,,8080).pipe_out                    0         0.00 Piped bytes to backend
 VBE.default(127.0.0.1,,8080).pipe_in                     0         0.00 Piped bytes from backend

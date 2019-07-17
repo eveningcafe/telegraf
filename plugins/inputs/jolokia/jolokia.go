@@ -143,7 +143,7 @@ func (j *Jolokia) doRequest(req *http.Request) ([]map[string]interface{}, error)
 
 	// Process response
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Response from url \"%s\" has status code %d (%s), expected %d (%s)",
+		err = fmt.Errorf("ResponseBody from url \"%s\" has status code %d (%s), expected %d (%s)",
 			req.RequestURI,
 			resp.StatusCode,
 			http.StatusText(resp.StatusCode),

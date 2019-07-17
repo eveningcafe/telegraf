@@ -18,7 +18,7 @@ func List(client *v3.IdentityClient) ([]Group, error) {
 	api, err := declareListGroup(client.Endpoint, client.Token)
 	err = api.DoReuest()
 	result := ListGroupResponse{}
-	err = json.Unmarshal([]byte(api.Response),&result)
+	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	groups := []Group{}
 	for _, v := range result.Groups {
 		groups = append(groups, Group{

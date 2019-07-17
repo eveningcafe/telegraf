@@ -48,11 +48,11 @@ func declareListHypervisor(endpoint string, token string) (*request.OpenstackAPI
 		Method:   "GET",
 		Endpoint: endpoint,
 		Path:     "/os-hypervisors/detail",
-		HeaderRequest: map[string]string{
+		RequestHeader: map[string]string{
 			"Content-Type": "application/json",
 			"X-OpenStack-Nova-API-Version": request.XOpenStackNovaAPIv2Version,
 			"X-Auth-Token": token,
 		},
-		Request: jsonBody,
+		RequestBody: jsonBody,
 	}, err
 }

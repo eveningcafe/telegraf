@@ -9,7 +9,7 @@ import (
 )
 
 func TestOpenstackInReal(t *testing.T) {
-	//fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	//fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.RequestBody) {
 	//	if r.URL.Path == "/endpoint" {
 	//		_, _ = w.Write([]byte(simpleJSON))
 	//	} else {
@@ -44,7 +44,7 @@ func TestOpenstackInReal(t *testing.T) {
 //func TestHTTPHeaders(t *testing.T) {
 //	header := "X-Special-Header"
 //	headerValue := "Special-Value"
-//	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.RequestBody) {
 //		if r.URL.Path == "/endpoint" {
 //			if r.Header.Get(header) == headerValue {
 //				_, _ = w.Write([]byte(simpleJSON))
@@ -75,7 +75,7 @@ func TestOpenstackInReal(t *testing.T) {
 //}
 //
 //func TestInvalidStatusCode(t *testing.T) {
-//	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.RequestBody) {
 //		w.WriteHeader(http.StatusNotFound)
 //	}))
 //	defer fakeServer.Close()
@@ -98,7 +98,7 @@ func TestOpenstackInReal(t *testing.T) {
 //}
 //
 //func TestMethod(t *testing.T) {
-//	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.RequestBody) {
 //		if r.Method == "POST" {
 //			w.WriteHeader(http.StatusOK)
 //		} else {
@@ -138,7 +138,7 @@ func TestOpenstackInReal(t *testing.T) {
 //	tests := []struct {
 //		name             string
 //		plugin           *plugin.HTTP
-//		queryHandlerFunc func(t *testing.T, w http.ResponseWriter, r *http.Request)
+//		queryHandlerFunc func(t *testing.T, w http.ResponseWriter, r *http.RequestBody)
 //	}{
 //		{
 //			name: "no body",
@@ -146,7 +146,7 @@ func TestOpenstackInReal(t *testing.T) {
 //				Method: "POST",
 //				URLs:   []string{url},
 //			},
-//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.RequestBody) {
 //				body, err := ioutil.ReadAll(r.Body)
 //				require.NoError(t, err)
 //				require.Equal(t, []byte(""), body)
@@ -160,7 +160,7 @@ func TestOpenstackInReal(t *testing.T) {
 //				Method: "POST",
 //				Body:   "test",
 //			},
-//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.RequestBody) {
 //				body, err := ioutil.ReadAll(r.Body)
 //				require.NoError(t, err)
 //				require.Equal(t, []byte("test"), body)
@@ -174,7 +174,7 @@ func TestOpenstackInReal(t *testing.T) {
 //				Method: "GET",
 //				Body:   "test",
 //			},
-//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.RequestBody) {
 //				body, err := ioutil.ReadAll(r.Body)
 //				require.NoError(t, err)
 //				require.Equal(t, []byte("test"), body)
@@ -189,7 +189,7 @@ func TestOpenstackInReal(t *testing.T) {
 //				Body:            "test",
 //				ContentEncoding: "gzip",
 //			},
-//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.RequestBody) {
 //				require.Equal(t, r.Header.Get("Content-Encoding"), "gzip")
 //
 //				gr, err := gzip.NewReader(r.Body)
@@ -203,7 +203,7 @@ func TestOpenstackInReal(t *testing.T) {
 //	}
 //	for _, tt := range tests {
 //		t.Run(tt.name, func(t *testing.T) {
-//			ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//			ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.RequestBody) {
 //				tt.queryHandlerFunc(t, w, r)
 //			})
 //

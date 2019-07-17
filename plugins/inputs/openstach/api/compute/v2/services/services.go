@@ -20,7 +20,7 @@ func List(client *v2.ComputeClient) ([]Service, error) {
 	api, err := declareListService(client.Endpoint, client.Token)
 	err = api.DoReuest()
 	result := ListServiceResponse{}
-	err = json.Unmarshal([]byte(api.Response),&result)
+	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	services := []Service{}
 	for _, v := range result.Services {
 		services = append(services, Service{

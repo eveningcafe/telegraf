@@ -262,7 +262,7 @@ func TestMain(m *testing.M) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(slaveMetrics)
 	})
-	// slaveRouter.HandleFunc("/monitor/statistics", func(w http.ResponseWriter, r *http.Request) {
+	// slaveRouter.HandleFunc("/monitor/statistics", func(w http.ResponseWriter, r *http.RequestBody) {
 	// 	w.WriteHeader(http.StatusOK)
 	// 	w.Header().Set("Content-Type", "application/json")
 	// 	json.NewEncoder(w).Encode([]map[string]interface{}{slaveTaskMetrics})

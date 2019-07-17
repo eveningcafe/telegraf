@@ -140,7 +140,7 @@ func (c *Client) read(requests []ReadRequest) ([]ReadResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Response from url \"%s\" has status code %d (%s), expected %d (%s)",
+		return nil, fmt.Errorf("ResponseBody from url \"%s\" has status code %d (%s), expected %d (%s)",
 			c.URL, resp.StatusCode, http.StatusText(resp.StatusCode), http.StatusOK, http.StatusText(http.StatusOK))
 	}
 

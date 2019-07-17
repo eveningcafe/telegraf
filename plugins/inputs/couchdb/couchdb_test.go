@@ -190,7 +190,7 @@ func TestBasic(t *testing.T) {
             "max": null
         },
         "400": {
-            "description": "number of HTTP 400 Bad Request responses",
+            "description": "number of HTTP 400 Bad RequestBody responses",
             "current": null,
             "sum": null,
             "mean": null,

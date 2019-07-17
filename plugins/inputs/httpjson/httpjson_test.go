@@ -122,7 +122,7 @@ type mockHTTPClient struct {
 	statusCode   int
 }
 
-// Mock implementation of MakeRequest. Usually returns an http.Response with
+// Mock implementation of MakeRequest. Usually returns an http.ResponseBody with
 // hard-coded responseBody and statusCode. However, if the request uses a
 // nonstandard method, it uses status code 405 (method not allowed)
 func (c *mockHTTPClient) MakeRequest(req *http.Request) (*http.Response, error) {

@@ -107,7 +107,7 @@ func (d *Datadog) Write(metrics []telegraf.Metric) error {
 	}
 	req, err := http.NewRequest("POST", d.authenticatedUrl(), bytes.NewBuffer(tsBytes))
 	if err != nil {
-		return fmt.Errorf("unable to create http.Request, %s\n", strings.Replace(err.Error(), d.Apikey, redactedApiKey, -1))
+		return fmt.Errorf("unable to create http.RequestBody, %s\n", strings.Replace(err.Error(), d.Apikey, redactedApiKey, -1))
 	}
 	req.Header.Add("Content-Type", "application/json")
 

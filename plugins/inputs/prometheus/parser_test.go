@@ -32,7 +32,7 @@ http_request_duration_microseconds_sum{handler="prometheus"} 1.8909097205e+07
 http_request_duration_microseconds_count{handler="prometheus"} 9
 `
 
-const validUniqueHistogram = `# HELP apiserver_request_latencies Response latency distribution in microseconds for each verb, resource and client.
+const validUniqueHistogram = `# HELP apiserver_request_latencies ResponseBody latency distribution in microseconds for each verb, resource and client.
 # TYPE apiserver_request_latencies histogram
 apiserver_request_latencies_bucket{resource="bindings",verb="POST",le="125000"} 1994
 apiserver_request_latencies_bucket{resource="bindings",verb="POST",le="250000"} 1997
@@ -68,7 +68,7 @@ http_request_duration_microseconds_count{handler="prometheus"} 9
 # HELP get_token_fail_count Counter of failed Token() requests to the alternate token source
 # TYPE get_token_fail_count counter
 get_token_fail_count 0
-# HELP apiserver_request_latencies Response latency distribution in microseconds for each verb, resource and client.
+# HELP apiserver_request_latencies ResponseBody latency distribution in microseconds for each verb, resource and client.
 # TYPE apiserver_request_latencies histogram
 apiserver_request_latencies_bucket{resource="bindings",verb="POST",le="125000"} 1994
 apiserver_request_latencies_bucket{resource="bindings",verb="POST",le="250000"} 1997

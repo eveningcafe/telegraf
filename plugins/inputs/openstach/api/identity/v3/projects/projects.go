@@ -28,7 +28,7 @@ func List(client *v3.IdentityClient) ([]Project, error) {
 	api, err := declareListProject(client.Endpoint, client.Token)
 	err = api.DoReuest()
 	result := ListProjectResponse{}
-	err = json.Unmarshal([]byte(api.Response),&result)
+	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	projects := []Project{}
 	for _, v := range result.Projects {
 		projects = append(projects, Project{

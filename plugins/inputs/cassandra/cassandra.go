@@ -215,7 +215,7 @@ func (j *Cassandra) getAttr(requestUrl *url.URL) (map[string]interface{}, error)
 
 	// Process response
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Response from url \"%s\" has status code %d (%s), expected %d (%s)",
+		err = fmt.Errorf("ResponseBody from url \"%s\" has status code %d (%s), expected %d (%s)",
 			requestUrl,
 			resp.StatusCode,
 			http.StatusText(resp.StatusCode),

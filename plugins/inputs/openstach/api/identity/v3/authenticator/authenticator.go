@@ -31,7 +31,7 @@ func AuthenticatedClient(options AuthOption) (*ProviderClient, error){
 	api, err := declareCreateToken(options.AuthURL,options.Username,options.Password,options.Project_name,options.UserDomainId,options.ProjectDomainId)
 	err = api.DoReuest()
 	result := CreateTokenResponse{}
-	err = json.Unmarshal([]byte(api.Response), &result)
+	err = json.Unmarshal([]byte(api.ResponseBody), &result)
 	p := ProviderClient{
 		UserName: result.Token.User.Name,
 		UserID: result.Token.User.ID,
@@ -39,7 +39,7 @@ func AuthenticatedClient(options AuthOption) (*ProviderClient, error){
 		ProjectID: result.Token.Project.ID,
 		authURL: options.AuthURL,
 		Catalog: result.Token.Catalog,
-		Token: textproto.MIMEHeader(api.HeaderResponse).Get("X-Subject-Token"),
+		Token: textproto.MIMEHeader(api.ResponseHeader).Get("X-Subject-Token"),
 	}
 	return &p, err
 }

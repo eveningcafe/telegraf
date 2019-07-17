@@ -42,11 +42,11 @@ func declareListUser(endpoint string, token string) (*request.OpenstackAPI, erro
 		Method:   "GET",
 		Endpoint: endpoint,
 		Path:     "/users",
-		HeaderRequest: map[string]string{
+		RequestHeader: map[string]string{
 			"Content-Type": "application/json",
 			"X-Auth-Token": token,
 		},
-		Request: jsonBody,
+		RequestBody: jsonBody,
 	}, err
 }
 

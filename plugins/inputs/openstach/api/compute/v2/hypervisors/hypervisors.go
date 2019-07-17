@@ -94,7 +94,7 @@ func List(client *v2.ComputeClient) ([]Hypervisor, error) {
 	apiList, err := declareListHypervisor(client.Endpoint, client.Token)
 	err = apiList.DoReuest()
 	result := ListHypervisorResponse{}
-	err = json.Unmarshal([]byte(apiList.Response),&result)
+	err = json.Unmarshal([]byte(apiList.ResponseBody),&result)
 	hypervisors := []Hypervisor{}
 	for _, v := range result.Hypervisors {
 		hypervisors = append(hypervisors, Hypervisor{

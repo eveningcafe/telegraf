@@ -88,7 +88,7 @@ func (a *Amon) Write(metrics []telegraf.Metric) error {
 	}
 	req, err := http.NewRequest("POST", a.authenticatedUrl(), bytes.NewBuffer(tsBytes))
 	if err != nil {
-		return fmt.Errorf("unable to create http.Request, %s\n", err.Error())
+		return fmt.Errorf("unable to create http.RequestBody, %s\n", err.Error())
 	}
 	req.Header.Add("Content-Type", "application/json")
 

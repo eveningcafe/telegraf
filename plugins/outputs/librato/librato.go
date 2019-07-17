@@ -140,7 +140,7 @@ func (l *Librato) Write(metrics []telegraf.Metric) error {
 			bytes.NewBuffer(metricsBytes))
 		if err != nil {
 			return fmt.Errorf(
-				"unable to create http.Request, %s\n",
+				"unable to create http.RequestBody, %s\n",
 				err.Error())
 		}
 		req.Header.Add("Content-Type", "application/json")

@@ -39,10 +39,10 @@ func declareListRegion(endpoint string, token string) (*request.OpenstackAPI, er
 		Method:   "GET",
 		Endpoint: endpoint,
 		Path:     "/regions",
-		HeaderRequest: map[string]string{
+		RequestHeader: map[string]string{
 			"Content-Type": "application/json",
 			"X-Auth-Token": token,
 		},
-		Request: jsonBody,
+		RequestBody: jsonBody,
 	}, err
 }

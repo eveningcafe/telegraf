@@ -47,7 +47,7 @@ type HTTPClient interface {
 	// req: HTTP request object
 	//
 	// Returns:
-	// http.Response:  HTTP respons object
+	// http.ResponseBody:  HTTP respons object
 	// error        :  Any error that may have occurred
 	MakeRequest(req *http.Request) (*http.Response, error)
 
@@ -271,7 +271,7 @@ func (h *GrayLog) sendRequest(serverURL string) (string, float64, error) {
 
 	// Process response
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Response from url \"%s\" has status code %d (%s), expected %d (%s)",
+		err = fmt.Errorf("ResponseBody from url \"%s\" has status code %d (%s), expected %d (%s)",
 			requestURL.String(),
 			resp.StatusCode,
 			http.StatusText(resp.StatusCode),

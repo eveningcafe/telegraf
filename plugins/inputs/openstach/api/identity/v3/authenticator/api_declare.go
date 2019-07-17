@@ -98,10 +98,10 @@ func declareCreateToken(endpoint string, userName string, password string, proje
 		Method:   "POST",
 		Endpoint: endpoint,
 		Path:     "/auth/tokens",
-		HeaderRequest: map[string]string{
+		RequestHeader: map[string]string{
 			"Content-Type": "application/json",
 		},
-		Request: jsonBody,
+		RequestBody:        jsonBody,
 		RequestBodyRequire: true,
 	}, err
 }

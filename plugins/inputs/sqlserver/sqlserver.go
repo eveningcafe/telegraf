@@ -583,8 +583,8 @@ FROM
 (
     SELECT
     rgwg.name AS instance,
-    rgwg.total_request_count AS "Request Count",
-    rgwg.total_queued_request_count AS "Queued Request Count",
+    rgwg.total_request_count AS "RequestBody Count",
+    rgwg.total_queued_request_count AS "Queued RequestBody Count",
     rgwg.total_cpu_limit_violation_count AS "CPU Limit Violation Count",
     rgwg.total_cpu_usage_ms AS "CPU Usage (time)",
     ' + CASE WHEN SERVERPROPERTY('ProductMajorVersion') > 10 THEN 'rgwg.total_cpu_usage_preemptive_ms AS "Premptive CPU Usage (time)",' ELSE '' END + '
@@ -596,7 +596,7 @@ FROM
     ON rgwg.pool_id = rgrp.pool_id
 ) AS rg
 UNPIVOT (
-    value FOR counter IN ( [Request Count], [Queued Request Count], [CPU Limit Violation Count], [CPU Usage (time)], ' + CASE WHEN SERVERPROPERTY('ProductMajorVersion') > 10 THEN '[Premptive CPU Usage (time)], ' ELSE '' END + '[Lock Wait Count], [Lock Wait Time], [Reduced Memory Grant Count] )
+    value FOR counter IN ( [RequestBody Count], [Queued RequestBody Count], [CPU Limit Violation Count], [CPU Usage (time)], ' + CASE WHEN SERVERPROPERTY('ProductMajorVersion') > 10 THEN '[Premptive CPU Usage (time)], ' ELSE '' END + '[Lock Wait Count], [Lock Wait Time], [Reduced Memory Grant Count] )
 ) AS vs'
 ,'"','''')
 

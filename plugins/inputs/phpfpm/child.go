@@ -21,7 +21,7 @@ import (
 )
 
 // request holds the state for an in-progress request. As soon as it's complete,
-// it's converted to an http.Request.
+// it's converted to an http.RequestBody.
 type request struct {
 	pw        *io.PipeWriter
 	reqId     uint16

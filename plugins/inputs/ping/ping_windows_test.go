@@ -254,10 +254,10 @@ func TestFatalPingGather(t *testing.T) {
 
 var UnreachablePingOutput = `
 Pinging www.google.pl [8.8.8.8] with 32 bytes of data:
-Request timed out.
-Request timed out.
+RequestBody timed out.
+RequestBody timed out.
 Reply from 194.204.175.50: Destination net unreachable.
-Request timed out.
+RequestBody timed out.
 
 Ping statistics for 8.8.8.8:
     Packets: Sent = 4, Received = 1, Lost = 3 (75% loss),
@@ -303,10 +303,10 @@ func TestUnreachablePingGather(t *testing.T) {
 
 var TTLExpiredPingOutput = `
 Pinging www.google.pl [8.8.8.8] with 32 bytes of data:
-Request timed out.
-Request timed out.
+RequestBody timed out.
+RequestBody timed out.
 Reply from 185.28.251.217: TTL expired in transit.
-Request timed out.
+RequestBody timed out.
 
 Ping statistics for 8.8.8.8:
     Packets: Sent = 4, Received = 1, Lost = 3 (75% loss),

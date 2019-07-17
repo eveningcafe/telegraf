@@ -30,10 +30,10 @@ func declareListService(endpoint string, token string) (*request.OpenstackAPI, e
 		Method:   "GET",
 		Endpoint: endpoint,
 		Path:     "/os-services",
-		HeaderRequest: map[string]string{
+		RequestHeader: map[string]string{
 			"Content-Type": "application/json",
 			"X-Auth-Token": token,
 		},
-		Request: jsonBody,
+		RequestBody: jsonBody,
 	}, err
 }

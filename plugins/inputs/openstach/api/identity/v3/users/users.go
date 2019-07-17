@@ -25,7 +25,7 @@ func List(client *v3.IdentityClient) ([]User, error) {
 	api, err := declareListUser(client.Endpoint, client.Token)
 	err = api.DoReuest()
 	result := ListUserResponse{}
-	err = json.Unmarshal([]byte(api.Response),&result)
+	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	users := []User{}
 	for _, v := range result.Users {
 		users = append(users, User{

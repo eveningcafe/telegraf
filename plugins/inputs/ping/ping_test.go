@@ -244,7 +244,7 @@ func TestLossyPingGather(t *testing.T) {
 
 var errorPingOutput = `
 PING www.amazon.com (176.32.98.166): 56 data bytes
-Request timeout for icmp_seq 0
+RequestBody timeout for icmp_seq 0
 
 --- www.amazon.com ping statistics ---
 2 packets transmitted, 0 packets received, 100.0% packet loss

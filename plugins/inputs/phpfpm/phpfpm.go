@@ -108,7 +108,7 @@ func (g *phpfpm) Gather(acc telegraf.Accumulator) error {
 	return nil
 }
 
-// Request status page to get stat raw data and import it
+// RequestBody status page to get stat raw data and import it
 func (g *phpfpm) gatherServer(addr string, acc telegraf.Accumulator) error {
 	if g.client == nil {
 		tlsCfg, err := g.ClientConfig.TLSConfig()

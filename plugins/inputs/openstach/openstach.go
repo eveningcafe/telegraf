@@ -2,13 +2,17 @@ package openstach
 
 import (
 	"fmt"
+	"log"
+	"strconv"
+
 	//"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/schedulerstats"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	blockstorage "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3"
-	blockstorageServices "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/services"
-	//blockstorageVolumes "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/volumes"
 	blockstorageScheduler "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/scheduler"
+	blockstorageServices "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/services"
+	blockstorageSnapshots "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/snapshots"
+	blockstorageVolumes "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/volumes"
 	compute "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2"
 	computeHypervisors "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2/hypervisors"
 	computeServices "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2/services"
@@ -18,7 +22,6 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/projects"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/services"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/users"
-	"log"
 )
 
 const (
@@ -68,17 +71,13 @@ type groupMap map[string]groups.Group
 
 type hypervisorMap map[string]computeHypervisors.Hypervisor
 
-// volume is a structure used to unmarshal raw JSON from the API into.
-//type volume struct {
-//	volumes.Volume
-//	volumetenants.VolumeTenantExt
-//}
-
-// volumeMap maps a volume id to a volume struct.
-// type volumeMap map[string]volume
+//volumeMap maps a volume id to a volume struct.
+type volumeMap map[string]blockstorageVolumes.Volumes
 
 // storagePoolMap maps a storage pool name to a StoragePool struct.
 type storagePoolMap map[string]blockstorageScheduler.StoragePool
+
+type networkMap map[string]blockstorageScheduler.StoragePool
 
 // OpenStack is the main structure associated with a collection instance.
 type OpenStack struct {
@@ -104,6 +103,8 @@ type OpenStack struct {
 	projects     projectMap
 	hypervisors  hypervisorMap
 	storagePools storagePoolMap
+	volumes      volumeMap
+	networks     networkMap
 }
 
 // SampleConfig return a sample configuration file for auto-generation and
@@ -151,6 +152,7 @@ func (o *OpenStack) initialize() error {
 	o.groups = groupMap{}
 	o.hypervisors = hypervisorMap{}
 	o.storagePools = storagePoolMap{}
+	o.volumes = volumeMap{}
 
 	return err
 }
@@ -216,17 +218,28 @@ func (o *OpenStack) gatherGroups() error {
 	return err
 }
 
-func (o *OpenStack) gatherStoragePools() error {
-	//storagePools, err := blockstorageScheduler.ListPool(o.volume)
-	//if err != nil {
-	//	return fmt.Errorf("unable to list storage pools: %v", err)
-	//}
-	//for _, storagePool := range storagePools {
-	//	o.storagePools[storagePool.Name] = storagePool
-	//}
-	//return err
+// gather volume per project
+func (o *OpenStack) gatherVolumes() error {
+	volumes, err := blockstorageVolumes.ListVolumes(o.volume)
+	if err != nil {
+		return fmt.Errorf("unable to list volumes: %v", err)
+	}
+	for _, volume := range volumes {
+		o.volumes[volume.ID] = volume
+	}
+	return err
+}
 
-	return nil
+// gather storage per pool
+func (o *OpenStack) gatherStoragePools() error {
+	storagePools, err := blockstorageScheduler.ListPool(o.volume)
+	if err != nil {
+		return fmt.Errorf("unable to list storage pools: %v", err)
+	}
+	for _, storagePool := range storagePools {
+		o.storagePools[storagePool.Name] = storagePool
+	}
+	return err
 }
 
 //
@@ -289,11 +302,11 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 func (o *OpenStack) accumulateNetwork(acc telegraf.Accumulator) {
 
 }
+
 //
 func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 	agents, err := blockstorageServices.List(o.volume)
 	if err != nil {
-
 	} else {
 		fields := fieldMap{}
 		for _, agent := range agents {
@@ -314,29 +327,50 @@ func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 }
 
 func (o *OpenStack) accumulateVolumesTenant(acc telegraf.Accumulator) {
-	//for _, volume := range o.volumes {
-	//	// Give empty types some form of field key
-	//	volumeType := "unknown"
-	//	if len(volume.VolumeType) != 0 {
-	//		volumeType = volume.VolumeType
-	//	}
-	//
-	//	// Try derive the associated project
-	//	project := "unknown"
-	//	if p, ok := o.projects[volume.TenantID]; ok {
-	//		project = p.Name
-	//	}
-	//
-	//	tags := tagMap{
-	//		"name":    volume.Name,
-	//		"project": project,
-	//		"type":    volumeType,
-	//	}
-	//	fields := fieldMap{
-	//		"size_gb": volume.Size,
-	//	}
-	//	acc.AddFields("openstack_volume", fields, tags)
-	//}
+	var numSnapshots int
+	snapshots, _ := blockstorageSnapshots.List(o.volume)
+
+	// add metric volumes
+	for _, volume := range o.volumes {
+		var volumeType interface{}
+		if volume.VolumeType != nil {
+			volumeType = volume.VolumeType
+		} else {
+			volumeType = "unknown"
+		}
+		// Try derive the associated project
+		var volumeProject interface{}
+		if p, ok := o.projects[volume.OsVolTenantAttrTenantID]; ok {
+			volumeProject = p.Name
+		} else {
+			volumeProject = "unknown"
+		}
+
+		tags := tagMap{
+			"volumeName": volume.Name.(string),
+			"project":    volumeProject.(string),
+			"type":       volumeType.(string),
+			"status":     volume.Status,
+			"zone":       volume.AvailabilityZone,
+		}
+
+		fields := fieldMap{
+			"size_gb": volume.Size,
+		}
+		acc.AddFields("openstack_volume", fields, tags)
+		// if volumes has snapshot add metric of it
+		numSnapshots = 0
+		for _, snapshot := range snapshots {
+			if snapshot.VolumeID == volume.ID {
+				numSnapshots++
+			}
+		}
+		if numSnapshots != 0 {
+			acc.AddFields("openstack_volume", fieldMap{
+				"num_snapshots": numSnapshots,
+			}, tags)
+		}
+	}
 }
 
 // accumulateStoragePools accumulates statistics about storage pools.
@@ -344,15 +378,20 @@ func (o *OpenStack) accumulateStoragePools(acc telegraf.Accumulator) {
 
 	for _, storagePool := range o.storagePools {
 		tags := tagMap{
-			"name": storagePool.Capabilities.VolumeBackendName,
+			"backed_state": storagePool.Capabilities.BackendState,
+			"backend_name": storagePool.Capabilities.VolumeBackendName,
+			"region":       o.Region,
 		}
+		overcommit, _ := strconv.ParseFloat(storagePool.Capabilities.MaxOverSubscriptionRatio, 64)
 		fields := fieldMap{
-			"total_capacity_gb": storagePool.Capabilities.TotalCapacityGB,
-			"free_capacity_gb":  storagePool.Capabilities.FreeCapacityGB,
+			"total_capacity_gb":           storagePool.Capabilities.TotalCapacityGb,
+			"free_capacity_gb":            storagePool.Capabilities.FreeCapacityGb,
+			"allocated_capacity_gb":       storagePool.Capabilities.AllocatedCapacityGb,
+			"provisioned_capacity_gb":     storagePool.Capabilities.ProvisionedCapacityGb,
+			"max_over_subscription_ratio": overcommit,
 		}
 		acc.AddFields("openstack_storage_pool", fields, tags)
 	}
-
 }
 
 // gather is a wrapper around library calls out to gophercloud that catches
@@ -382,11 +421,12 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 		"group":         o.gatherGroups,
 		"hypervisors":   o.gatherHypervisors,
 		"storage pools": o.gatherStoragePools,
+		"volumes":       o.gatherVolumes,
 	}
 
 	for resources, gatherer := range gatherers {
 		if err := gather(gatherer); err != nil {
-			log.Println("W!", plugin, "failed to get", resources, ":", err)
+			log.Println("W!", plugin, "failed to get", resources, " : ", err)
 		}
 	}
 	// Accumulate statistics

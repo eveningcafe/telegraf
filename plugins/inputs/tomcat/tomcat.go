@@ -78,7 +78,7 @@ var sampleconfig = `
   # username = "tomcat"
   # password = "s3cret"
 
-  ## Request timeout
+  ## RequestBody timeout
   # timeout = "5s"
 
   ## Optional TLS Config

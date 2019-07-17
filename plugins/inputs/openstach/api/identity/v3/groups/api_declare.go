@@ -34,11 +34,11 @@ func declareListGroup(endpoint string, token string) (*request.OpenstackAPI, err
 		Method:   "GET",
 		Endpoint: endpoint,
 		Path:     "/groups",
-		HeaderRequest : map[string]string{
+		RequestHeader: map[string]string{
 			"Content-Type": "application/json",
 			"X-Auth-Token": token,
 		},
-		Request: jsonBody,
+		RequestBody: jsonBody,
 	}, err
 }
 

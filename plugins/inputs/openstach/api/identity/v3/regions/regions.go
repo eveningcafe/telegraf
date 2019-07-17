@@ -25,7 +25,7 @@ func List(client *v3.IdentityClient) ([]Region, error) {
 	api, err := declareListRegion(client.Endpoint, client.Token)
 	err = api.DoReuest()
 	result := ListRegionResponse{}
-	err = json.Unmarshal([]byte(api.Response),&result)
+	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	regions := []Region{}
 	for _, v := range result.Regions {
 		regions = append(regions, Region{
