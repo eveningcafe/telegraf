@@ -13,7 +13,7 @@ type Agent struct {
 	Configurations   interface{}
 	Alive            bool
 	AgentType        string
-	AvailabilityZone interface{}
+	AvailabilityZone string
 	Topic            string
 }
 func List(client *v2.NetworkClient) ([]Agent, error) {
@@ -22,7 +22,12 @@ func List(client *v2.NetworkClient) ([]Agent, error) {
 	result := ListAgentResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	agents := []Agent{}
+
 	for _, v := range result.Agents {
+		zone := "unknow"
+		if v.AvailabilityZone != nil{
+			zone = v.AvailabilityZone.(string)
+		}
 		agents = append(agents, Agent{
 			ID: v.ID,
 			Binary: v.Binary,
@@ -31,7 +36,7 @@ func List(client *v2.NetworkClient) ([]Agent, error) {
 			Configurations: v.Configurations,
 			Alive: v.Alive,
 			AgentType: v.AgentType,
-			AvailabilityZone : v.AvailabilityZone,
+			AvailabilityZone : zone,
 			Topic: v.Topic,
 		})
 	}

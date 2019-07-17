@@ -22,6 +22,8 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/projects"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/services"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/users"
+	networking "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2"
+	networkingAgent "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/agents"
 )
 
 const (
@@ -68,7 +70,6 @@ type serviceMap map[string]services.Service
 type projectMap map[string]projects.Project
 type userMap map[string]users.User
 type groupMap map[string]groups.Group
-
 type hypervisorMap map[string]computeHypervisors.Hypervisor
 
 //volumeMap maps a volume id to a volume struct.
@@ -92,9 +93,10 @@ type OpenStack struct {
 	Region           string
 
 	// Locally cached clients
-	identity *identity.IdentityClient
-	compute  *compute.ComputeClient
-	volume   *blockstorage.VolumeClient
+	identityClient *identity.IdentityClient
+	computeClient  *compute.ComputeClient
+	volumeClient   *blockstorage.VolumeClient
+	networkClient  *networking.NetworkClient
 
 	// Locally cached resources
 	services     serviceMap
@@ -135,13 +137,13 @@ func (o *OpenStack) initialize() error {
 	}
 
 	// Create required clients and attach to the OpenStack struct
-	if o.identity, err = identity.NewIdentityV3(*provider, o.Region); err != nil {
+	if o.identityClient, err = identity.NewIdentityV3(*provider, o.Region); err != nil {
 		return fmt.Errorf("unable to create V3 identity client: %v", err)
 	}
-	if o.compute, err = compute.NewComputeV2(*provider, o.Region); err != nil {
+	if o.computeClient, err = compute.NewComputeV2(*provider, o.Region); err != nil {
 		return fmt.Errorf("unable to create V2 compute client: %v", err)
 	}
-	if o.volume, err = blockstorage.NewBlockStorageV3(*provider, o.Region); err != nil {
+	if o.volumeClient, err = blockstorage.NewBlockStorageV3(*provider, o.Region); err != nil {
 		return fmt.Errorf("unable to create V3 block storage client: %v", err)
 	}
 
@@ -159,7 +161,7 @@ func (o *OpenStack) initialize() error {
 
 // gatherHypervisors collects hypervisors from the OpenStack API.
 func (o *OpenStack) gatherHypervisors() error {
-	hypervisors, err := computeHypervisors.List(o.compute)
+	hypervisors, err := computeHypervisors.List(o.computeClient)
 	if err != nil {
 		return fmt.Errorf("unable to extract hypervisors: %v", err)
 	}
@@ -172,7 +174,7 @@ func (o *OpenStack) gatherHypervisors() error {
 
 // gatherServices collects services from the OpenStack API.
 func (o *OpenStack) gatherServices() error {
-	services, err := services.List(o.identity)
+	services, err := services.List(o.identityClient)
 	if err != nil {
 		return fmt.Errorf("unable to list services: %v", err)
 	}
@@ -184,7 +186,7 @@ func (o *OpenStack) gatherServices() error {
 }
 
 func (o *OpenStack) gatherProjects() error {
-	projects, err := projects.List(o.identity)
+	projects, err := projects.List(o.identityClient)
 	if err != nil {
 		return fmt.Errorf("unable to list project: %v", err)
 	}
@@ -195,7 +197,7 @@ func (o *OpenStack) gatherProjects() error {
 	return err
 }
 func (o *OpenStack) gatherUsers() error {
-	users, err := users.List(o.identity)
+	users, err := users.List(o.identityClient)
 	if err != nil {
 		return fmt.Errorf("unable to list user: %v", err)
 	}
@@ -207,7 +209,7 @@ func (o *OpenStack) gatherUsers() error {
 }
 
 func (o *OpenStack) gatherGroups() error {
-	groups, err := groups.List(o.identity)
+	groups, err := groups.List(o.identityClient)
 	if err != nil {
 		return fmt.Errorf("unable to list groups: %v", err)
 	}
@@ -220,7 +222,7 @@ func (o *OpenStack) gatherGroups() error {
 
 // gather volume per project
 func (o *OpenStack) gatherVolumes() error {
-	volumes, err := blockstorageVolumes.ListVolumes(o.volume)
+	volumes, err := blockstorageVolumes.ListVolumes(o.volumeClient)
 	if err != nil {
 		return fmt.Errorf("unable to list volumes: %v", err)
 	}
@@ -232,7 +234,7 @@ func (o *OpenStack) gatherVolumes() error {
 
 // gather storage per pool
 func (o *OpenStack) gatherStoragePools() error {
-	storagePools, err := blockstorageScheduler.ListPool(o.volume)
+	storagePools, err := blockstorageScheduler.ListPool(o.volumeClient)
 	if err != nil {
 		return fmt.Errorf("unable to list storage pools: %v", err)
 	}
@@ -244,7 +246,7 @@ func (o *OpenStack) gatherStoragePools() error {
 
 //
 func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
-	agents, err := computeServices.List(o.compute)
+	agents, err := computeServices.List(o.computeClient)
 	if err != nil {
 
 	} else {
@@ -299,13 +301,38 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 }
 
 //
-func (o *OpenStack) accumulateNetwork(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
+	agents, err := networkingAgent.List(o.networkClient)
+	if err != nil {
+	} else {
+		fields := fieldMap{}
+		for _, agent := range agents {
+			if agent.Alive == true {
+				fields["agent_state"] = 1
+			} else {
+				fields["agent_state"] = 0
+			}
+			var status string
+			if agent.AdminStateUp == true {
+				status = "enable"
+			}else {
+				status = "disable"
+			}
 
+			acc.AddFields("openstack_volumes", fields, tagMap{
+				"region":   o.Region,
+				"service":  agent.Binary,
+				"hostname": agent.Host,
+				"status":   status,
+				"zone":     agent.AvailabilityZone,
+			})
+		}
+	}
 }
 
 //
 func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
-	agents, err := blockstorageServices.List(o.volume)
+	agents, err := blockstorageServices.List(o.volumeClient)
 	if err != nil {
 	} else {
 		fields := fieldMap{}
@@ -326,9 +353,9 @@ func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 	}
 }
 
-func (o *OpenStack) accumulateVolumesTenant(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateVolumesPerTenant(acc telegraf.Accumulator) {
 	var numSnapshots int
-	snapshots, _ := blockstorageSnapshots.List(o.volume)
+	snapshots, _ := blockstorageSnapshots.List(o.volumeClient)
 
 	// add metric volumes
 	for _, volume := range o.volumes {
@@ -348,8 +375,9 @@ func (o *OpenStack) accumulateVolumesTenant(acc telegraf.Accumulator) {
 
 		tags := tagMap{
 			"volumeName": volume.Name.(string),
+			"volumeID": volume.ID,
 			"project":    volumeProject.(string),
-			"type":       volumeType.(string),
+			"volumeType":       volumeType.(string),
 			"status":     volume.Status,
 			"zone":       volume.AvailabilityZone,
 		}
@@ -374,7 +402,7 @@ func (o *OpenStack) accumulateVolumesTenant(acc telegraf.Accumulator) {
 }
 
 // accumulateStoragePools accumulates statistics about storage pools.
-func (o *OpenStack) accumulateStoragePools(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) {
 
 	for _, storagePool := range o.storagePools {
 		tags := tagMap{
@@ -434,10 +462,10 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 		o.accumulateIdentity,
 		o.accumulateComputeAgents,
 		o.accumulateComputeHypervisors,
-		//o.accumulateNetwork,
+		o.accumulateNetworkAgents,
 		o.accumulateVolumeAgents,
-		o.accumulateStoragePools,
-		o.accumulateVolumesTenant,
+		o.accumulateVolumeStoragePools,
+		o.accumulateVolumesPerTenant,
 	}
 	for _, accumulator := range accumulators {
 		//go routine in here
