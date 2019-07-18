@@ -24,7 +24,8 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/users"
 	networking "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2"
 	networkingAgent "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/agents"
-    networkingFloatingIP "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/floatingips"
+	networkingFloatingIP "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/floatingips"
+	networkingNET "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/networks"
 )
 
 const (
@@ -79,7 +80,7 @@ type volumeMap map[string]blockstorageVolumes.Volumes
 // storagePoolMap maps a storage pool name to a StoragePool struct.
 type storagePoolMap map[string]blockstorageScheduler.StoragePool
 
-type networkMap map[string]blockstorageScheduler.StoragePool
+type networkMap map[string]networkingNET.Network
 
 // OpenStack is the main structure associated with a collection instance.
 type OpenStack struct {
@@ -172,8 +173,7 @@ func (o *OpenStack) gatherHypervisors() error {
 	for _, hypervisor := range hypervisors {
 		o.hypervisors[hypervisor.ID] = hypervisor
 	}
-	//return err
-	return nil
+	return err
 }
 
 // gatherServices collects services from the OpenStack API.
@@ -185,7 +185,6 @@ func (o *OpenStack) gatherServices() error {
 	for _, service := range services {
 		o.services[service.ID] = service
 	}
-
 	return err
 }
 
@@ -252,12 +251,12 @@ func (o *OpenStack) gatherStoragePools() error {
 func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
 	agents, err := computeServices.List(o.computeClient)
 	if err != nil {
-		acc.AddFields("openstack_compute", fieldMap{"api_state" : 0,}, tagMap{
-			"region":   o.Region,
+		acc.AddFields("openstack_compute", fieldMap{"api_state": 0,}, tagMap{
+			"region": o.Region,
 		})
 	} else {
-		acc.AddFields("openstack_compute", fieldMap{"api_state" : 1,}, tagMap{
-			"region":   o.Region,
+		acc.AddFields("openstack_compute", fieldMap{"api_state": 1,}, tagMap{
+			"region": o.Region,
 		})
 
 		fields := fieldMap{}
@@ -280,7 +279,6 @@ func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
 
 // accumulateHypervisors accumulates statistics from hypervisors.
 func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
-
 	for _, hypervisor := range o.hypervisors {
 		fields := fieldMap{
 			"memory_mb_total":     hypervisor.MemoryMB,
@@ -300,7 +298,6 @@ func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
 
 // accumulateIdentity accumulates statistics from the identity service.
 func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
-
 	fields := fieldMap{
 		"num_projects": len(o.projects),
 		"num_servives": len(o.services),
@@ -314,12 +311,12 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
 	agents, err := networkingAgent.List(o.networkClient)
 	if err != nil {
-		acc.AddFields("openstack_network", fieldMap{"api_state" : 0,}, tagMap{
-			"region":   o.Region,
+		acc.AddFields("openstack_network", fieldMap{"api_state": 0,}, tagMap{
+			"region": o.Region,
 		})
 	} else {
-		acc.AddFields("openstack_network", fieldMap{"api_state" : 1,}, tagMap{
-			"region":   o.Region,
+		acc.AddFields("openstack_network", fieldMap{"api_state": 1,}, tagMap{
+			"region": o.Region,
 		})
 		fields := fieldMap{}
 		for _, agent := range agents {
@@ -331,7 +328,7 @@ func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
 			var status string
 			if agent.AdminStateUp == true {
 				status = "enable"
-			}else {
+			} else {
 				status = "disable"
 			}
 
@@ -348,38 +345,61 @@ func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
 
 //
 func (o *OpenStack) accumulateNetworkFloatingIP(acc telegraf.Accumulator) {
-	floatingIp, err := networkingFloatingIP.List(o.networkClient)
-	if err!=nil{
+	floatingIps, err := networkingFloatingIP.List(o.networkClient)
+	if err != nil {
 		// bypass cause openstack use provider network model
-	}else{
-		fmt.Println(floatingIp)
+	} else {
+		fmt.Println(floatingIps)
 		fmt.Println(err)
 	}
-
 }
 
-// net and subnet
+// num_net and subnet, need tag network provider or not
 func (o *OpenStack) accumulateNetworkNET(acc telegraf.Accumulator) {
+	networks, err := networkingNET.List(o.networkClient)
+	if err != nil {
+		//
+	} else {
+		acc.AddFields("openstack_network",fieldMap{
+			"num_network": len(networks),
+		},tagMap{
+			"region": o.Region,
+		})
+	}
+	for _, network := range networks {
+		acc.AddFields("openstack_network",fieldMap{
+			"num_subnet": len(network.Subnets),
+		},tagMap{
+			"region": o.Region,
+		})
+	}
 }
 
 //
 func (o *OpenStack) accumulateNetworkIp(acc telegraf.Accumulator) {
-
+	ipAvail, err := networkingNET.ListAllIPAvailabilities(o.networkClient)
+	if err != nil {
+		//
+	} else {
+		fmt.Println(ipAvail)
+	}
 }
+
 //
 func (o *OpenStack) accumulateNetworkSecutiryGroup(acc telegraf.Accumulator) {
 
 }
+
 //
 func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 	agents, err := blockstorageServices.List(o.volumeClient)
 	if err != nil {
-		acc.AddFields("openstack_volumes", fieldMap{"api_state" : 0,}, tagMap{
-			"region":   o.Region,
+		acc.AddFields("openstack_volumes", fieldMap{"api_state": 0,}, tagMap{
+			"region": o.Region,
 		})
 	} else {
-		acc.AddFields("openstack_volumes", fieldMap{"api_state" : 1,}, tagMap{
-			"region":   o.Region,
+		acc.AddFields("openstack_volumes", fieldMap{"api_state": 1,}, tagMap{
+			"region": o.Region,
 		})
 
 		fields := fieldMap{}
@@ -422,9 +442,9 @@ func (o *OpenStack) accumulateVolumesPerTenant(acc telegraf.Accumulator) {
 
 		tags := tagMap{
 			"volumeName": volume.Name.(string),
-			"volumeID": volume.ID,
+			"volumeID":   volume.ID,
 			"project":    volumeProject.(string),
-			"volumeType":       volumeType.(string),
+			"volumeType": volumeType.(string),
 			"status":     volume.Status,
 			"zone":       volume.AvailabilityZone,
 		}
