@@ -34,7 +34,7 @@ func declareListAgent(endpoint string, token string) (*request.OpenstackAPI, err
 	return &request.OpenstackAPI{
 		Method:   "GET",
 		Endpoint: endpoint,
-		Path:     "/agents",
+		Path:     "/v2.0/agents",
 		RequestHeader: map[string]string{
 			"Content-Type": "application/json",
 			"X-Auth-Token": token,

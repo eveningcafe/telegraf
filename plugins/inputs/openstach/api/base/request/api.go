@@ -50,17 +50,16 @@ func (o *OpenstackAPI) DoReuest() (error) {
 		request.Header.Add(k,v)
 	}
 	resp, err := httpClient.Do(request)
-	o.ResponseHeader = resp.Header
-	defer resp.Body.Close()
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
 	} else {
 		err = errors.New("RequestBody to "+request.URL.Path+"Respond status code "+ string(resp.StatusCode))
 		return err
 	}
-	
+	o.ResponseHeader = resp.Header
 	o.ResponseBody, err = ioutil.ReadAll(resp.Body)
 	return  err
 }

@@ -19,10 +19,12 @@ type Agent struct {
 func List(client *v2.NetworkClient) ([]Agent, error) {
 	api, err := declareListAgent(client.Endpoint, client.Token)
 	err = api.DoReuest()
+	if err!=nil {
+		return nil, err
+	}
 	result := ListAgentResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	agents := []Agent{}
-
 	for _, v := range result.Agents {
 		zone := "unknow"
 		if v.AvailabilityZone != nil{

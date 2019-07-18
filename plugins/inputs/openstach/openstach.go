@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/users"
 	networking "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2"
 	networkingAgent "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/agents"
+    networkingFloatingIP "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/floatingips"
 )
 
 const (
@@ -135,7 +136,6 @@ func (o *OpenStack) initialize() error {
 	if err != nil {
 		return fmt.Errorf("Unable to authenticate OpenStack user: %v", err)
 	}
-
 	// Create required clients and attach to the OpenStack struct
 	if o.identityClient, err = identity.NewIdentityV3(*provider, o.Region); err != nil {
 		return fmt.Errorf("unable to create V3 identity client: %v", err)
@@ -145,6 +145,10 @@ func (o *OpenStack) initialize() error {
 	}
 	if o.volumeClient, err = blockstorage.NewBlockStorageV3(*provider, o.Region); err != nil {
 		return fmt.Errorf("unable to create V3 block storage client: %v", err)
+	}
+
+	if o.networkClient, err = networking.NewNetworkClientV2(*provider, o.Region); err != nil {
+		return fmt.Errorf("unable to create V3 networking client: %v", err)
 	}
 
 	// Initialize resource maps and slices
@@ -248,8 +252,14 @@ func (o *OpenStack) gatherStoragePools() error {
 func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
 	agents, err := computeServices.List(o.computeClient)
 	if err != nil {
-
+		acc.AddFields("openstack_compute", fieldMap{"api_state" : 0,}, tagMap{
+			"region":   o.Region,
+		})
 	} else {
+		acc.AddFields("openstack_compute", fieldMap{"api_state" : 1,}, tagMap{
+			"region":   o.Region,
+		})
+
 		fields := fieldMap{}
 		for _, agent := range agents {
 			if agent.State == "up" {
@@ -304,7 +314,13 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
 	agents, err := networkingAgent.List(o.networkClient)
 	if err != nil {
+		acc.AddFields("openstack_network", fieldMap{"api_state" : 0,}, tagMap{
+			"region":   o.Region,
+		})
 	} else {
+		acc.AddFields("openstack_network", fieldMap{"api_state" : 1,}, tagMap{
+			"region":   o.Region,
+		})
 		fields := fieldMap{}
 		for _, agent := range agents {
 			if agent.Alive == true {
@@ -331,10 +347,41 @@ func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
 }
 
 //
+func (o *OpenStack) accumulateNetworkFloatingIP(acc telegraf.Accumulator) {
+	floatingIp, err := networkingFloatingIP.List(o.networkClient)
+	if err!=nil{
+		// bypass cause openstack use provider network model
+	}else{
+		fmt.Println(floatingIp)
+		fmt.Println(err)
+	}
+
+}
+
+// net and subnet
+func (o *OpenStack) accumulateNetworkNET(acc telegraf.Accumulator) {
+}
+
+//
+func (o *OpenStack) accumulateNetworkIp(acc telegraf.Accumulator) {
+
+}
+//
+func (o *OpenStack) accumulateNetworkSecutiryGroup(acc telegraf.Accumulator) {
+
+}
+//
 func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 	agents, err := blockstorageServices.List(o.volumeClient)
 	if err != nil {
+		acc.AddFields("openstack_volumes", fieldMap{"api_state" : 0,}, tagMap{
+			"region":   o.Region,
+		})
 	} else {
+		acc.AddFields("openstack_volumes", fieldMap{"api_state" : 1,}, tagMap{
+			"region":   o.Region,
+		})
+
 		fields := fieldMap{}
 		for _, agent := range agents {
 			if agent.State == "up" {
@@ -438,7 +485,6 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	if err := o.initialize(); err != nil {
 		return err
 	}
-
 	// Gather resources.  Note service harvesting must come first as the other
 	// gatherers are dependant on this information.
 
@@ -463,6 +509,9 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 		o.accumulateComputeAgents,
 		o.accumulateComputeHypervisors,
 		o.accumulateNetworkAgents,
+		o.accumulateNetworkFloatingIP,
+		o.accumulateNetworkNET,
+		o.accumulateNetworkIp,
 		o.accumulateVolumeAgents,
 		o.accumulateVolumeStoragePools,
 		o.accumulateVolumesPerTenant,
