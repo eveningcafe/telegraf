@@ -63,6 +63,3 @@ func (o *OpenstackAPI) DoReuest() (error) {
 	o.ResponseBody, err = ioutil.ReadAll(resp.Body)
 	return  err
 }
-
-
-

@@ -40,6 +40,7 @@ type Network struct {
 		ProviderSegmentationID  int    `json:"provider:segmentation_id"`
 	} `json:"segments,omitempty"`
 }
+
 //
 type IPAvailabilities struct {
 		NetworkID            string `json:"network_id"`
@@ -74,7 +75,7 @@ func List(client *v2.NetworkClient) ([]Network, error) {
 	return networks, err
 }
 
-func ListAllIPAvailabilities(client *v2.NetworkClient) ([]IPAvailabilities, error) {
+func NetworkIPAvailabilities(client *v2.NetworkClient) ([]IPAvailabilities, error) {
 	api, err := declareNetworkIPAvailabilities(client.Endpoint, client.Token)
 	err = api.DoReuest()
 	if err != nil {

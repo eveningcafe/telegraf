@@ -9,12 +9,12 @@ import (
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	blockstorage "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3"
+	blockstorageQuotas "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/quotas"
 	blockstorageScheduler "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/scheduler"
 	blockstorageServices "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/services"
-	blockstorageSnapshots "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/snapshots"
-	blockstorageVolumes "github.com/influxdata/telegraf/plugins/inputs/openstach/api/blockstorage/v3/volumes"
 	compute "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2"
 	computeHypervisors "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2/hypervisors"
+	computeQuotas "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2/quotas"
 	computeServices "github.com/influxdata/telegraf/plugins/inputs/openstach/api/compute/v2/services"
 	identity "github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3"
 	"github.com/influxdata/telegraf/plugins/inputs/openstach/api/identity/v3/authenticator"
@@ -26,6 +26,7 @@ import (
 	networkingAgent "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/agents"
 	networkingFloatingIP "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/floatingips"
 	networkingNET "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/networks"
+	networkingQuotas "github.com/influxdata/telegraf/plugins/inputs/openstach/api/networking/v2/quotas"
 )
 
 const (
@@ -74,13 +75,8 @@ type userMap map[string]users.User
 type groupMap map[string]groups.Group
 type hypervisorMap map[string]computeHypervisors.Hypervisor
 
-//volumeMap maps a volume id to a volume struct.
-type volumeMap map[string]blockstorageVolumes.Volumes
-
 // storagePoolMap maps a storage pool name to a StoragePool struct.
 type storagePoolMap map[string]blockstorageScheduler.StoragePool
-
-type networkMap map[string]networkingNET.Network
 
 // OpenStack is the main structure associated with a collection instance.
 type OpenStack struct {
@@ -107,8 +103,6 @@ type OpenStack struct {
 	projects     projectMap
 	hypervisors  hypervisorMap
 	storagePools storagePoolMap
-	volumes      volumeMap
-	networks     networkMap
 }
 
 // SampleConfig return a sample configuration file for auto-generation and
@@ -159,7 +153,6 @@ func (o *OpenStack) initialize() error {
 	o.groups = groupMap{}
 	o.hypervisors = hypervisorMap{}
 	o.storagePools = storagePoolMap{}
-	o.volumes = volumeMap{}
 
 	return err
 }
@@ -220,18 +213,6 @@ func (o *OpenStack) gatherGroups() error {
 		o.groups[group.ID] = group
 	}
 
-	return err
-}
-
-// gather volume per project
-func (o *OpenStack) gatherVolumes() error {
-	volumes, err := blockstorageVolumes.ListVolumes(o.volumeClient)
-	if err != nil {
-		return fmt.Errorf("unable to list volumes: %v", err)
-	}
-	for _, volume := range volumes {
-		o.volumes[volume.ID] = volume
-	}
 	return err
 }
 
@@ -296,6 +277,40 @@ func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
 	}
 }
 
+//
+func (o *OpenStack) accumulateComputeProjectQuotas(acc telegraf.Accumulator) {
+	for _, p := range o.projects {
+		if p.Name == "service" {continue}
+		computeQuotas, err := computeQuotas.Detail(o.computeClient, p.ID)
+		if err != nil {
+		} else {
+
+			if (computeQuotas.Cores.Limit == -1) {
+				computeQuotas.Cores.Limit = 99999
+			}
+			if (computeQuotas.RAM.Limit == -1) {
+				computeQuotas.RAM.Limit = 99999
+			}
+			if (computeQuotas.Instances.Limit == -1) {
+				computeQuotas.Instances.Limit = 99999
+			}
+
+			acc.AddFields("openstack_compute", fieldMap{
+				"cpu_limit":      computeQuotas.Cores.Limit,
+				"cpu_used":       computeQuotas.Cores.InUse,
+				"ram_limit":      computeQuotas.RAM.Limit,
+				"ram_used":       computeQuotas.RAM.InUse,
+				"instance_limit": computeQuotas.Instances.Limit,
+				"instance_used":  computeQuotas.Instances.InUse,
+			}, tagMap{
+				"region":  o.Region,
+				"project": p.Name,
+			})
+		}
+	}
+}
+
+//
 // accumulateIdentity accumulates statistics from the identity service.
 func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 	fields := fieldMap{
@@ -332,7 +347,7 @@ func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
 				status = "disable"
 			}
 
-			acc.AddFields("openstack_volumes", fields, tagMap{
+			acc.AddFields("openstack_network", fields, tagMap{
 				"region":   o.Region,
 				"service":  agent.Binary,
 				"hostname": agent.Host,
@@ -348,9 +363,18 @@ func (o *OpenStack) accumulateNetworkFloatingIP(acc telegraf.Accumulator) {
 	floatingIps, err := networkingFloatingIP.List(o.networkClient)
 	if err != nil {
 		// bypass cause openstack use provider network model
+		acc.AddFields("openstack_network", fieldMap{
+			"floating_ip": 0,
+		}, tagMap{
+			"region": o.Region,
+		})
+
 	} else {
-		fmt.Println(floatingIps)
-		fmt.Println(err)
+		acc.AddFields("openstack_network", fieldMap{
+			"floating_ip": len(floatingIps),
+		}, tagMap{
+			"region": o.Region,
+		})
 	}
 }
 
@@ -360,16 +384,16 @@ func (o *OpenStack) accumulateNetworkNET(acc telegraf.Accumulator) {
 	if err != nil {
 		//
 	} else {
-		acc.AddFields("openstack_network",fieldMap{
+		acc.AddFields("openstack_network", fieldMap{
 			"num_network": len(networks),
-		},tagMap{
+		}, tagMap{
 			"region": o.Region,
 		})
 	}
 	for _, network := range networks {
-		acc.AddFields("openstack_network",fieldMap{
+		acc.AddFields("openstack_network", fieldMap{
 			"num_subnet": len(network.Subnets),
-		},tagMap{
+		}, tagMap{
 			"region": o.Region,
 		})
 	}
@@ -377,17 +401,81 @@ func (o *OpenStack) accumulateNetworkNET(acc telegraf.Accumulator) {
 
 //
 func (o *OpenStack) accumulateNetworkIp(acc telegraf.Accumulator) {
-	ipAvail, err := networkingNET.ListAllIPAvailabilities(o.networkClient)
+	ipAvail, err := networkingNET.NetworkIPAvailabilities(o.networkClient)
 	if err != nil {
 		//
 	} else {
-		fmt.Println(ipAvail)
+		for _, ipAvailNet := range ipAvail {
+			project := "unknown"
+			if p, ok := o.projects[ipAvailNet.TenantID]; ok {
+				project = p.Name
+			}
+			for _, ipAvalSubnet := range ipAvailNet.SubnetIPAvailability {
+				tags := tagMap{
+					"region":      o.Region,
+					"network":     ipAvailNet.NetworkName,
+					"subnet_cidr": ipAvalSubnet.Cidr,
+					"project":     project,
+				}
+				acc.AddFields("openstack_network", fieldMap{
+					"ip_total": ipAvalSubnet.TotalIps,
+					"ip_used":  ipAvailNet.UsedIps,
+				}, tags)
+			}
+
+			acc.AddFields("openstack_network", fieldMap{
+				"ip_used":  ipAvailNet.UsedIps,
+				"ip_total": ipAvailNet.TotalIps,
+			}, tagMap{
+				"region":      o.Region,
+				"network":     ipAvailNet.NetworkName,
+				"subnet_cidr": "all",
+				"project":     project,
+			})
+
+		}
 	}
 }
 
 //
-func (o *OpenStack) accumulateNetworkSecutiryGroup(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateNetworkProjectQuotas(acc telegraf.Accumulator) {
 
+	for _, p := range o.projects {
+		if p.Name == "service" {continue}
+		netQuotas, err := networkingQuotas.Detail(o.networkClient, p.ID)
+		if err != nil {
+		} else {
+
+			if (netQuotas.Network.Limit == -1) {
+				netQuotas.Network.Limit = 99999
+			}
+			if (netQuotas.SecurityGroup.Limit == -1) {
+				netQuotas.SecurityGroup.Limit = 99999
+			}
+			if (netQuotas.Subnet.Limit == -1) {
+				netQuotas.Subnet.Limit = 99999
+			}
+			if (netQuotas.Port.Limit == -1) {
+				netQuotas.Port.Limit = 99999
+			}
+
+			acc.AddFields("openstack_network", fieldMap{
+				"network_limit":       netQuotas.Network.Limit,
+				"network_used":        netQuotas.Network.Used,
+				"securityGroup_limit": netQuotas.SecurityGroup.Limit,
+				"securityGroup_used":  netQuotas.SecurityGroup.Used,
+				"securityRule_limit":  netQuotas.SecurityGroupRule.Limit,
+				"securityRule_used":   netQuotas.SecurityGroupRule.Used,
+				"subnet_limit":        netQuotas.Subnet.Limit,
+				"subnet_used":         netQuotas.Subnet.Used,
+				"port_limit":          netQuotas.Port.Limit,
+				"port_used":           netQuotas.Port.Used,
+			}, tagMap{
+				"region":  o.Region,
+				"project": p.Name,
+			})
+		}
+	}
 }
 
 //
@@ -420,54 +508,6 @@ func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 	}
 }
 
-func (o *OpenStack) accumulateVolumesPerTenant(acc telegraf.Accumulator) {
-	var numSnapshots int
-	snapshots, _ := blockstorageSnapshots.List(o.volumeClient)
-
-	// add metric volumes
-	for _, volume := range o.volumes {
-		var volumeType interface{}
-		if volume.VolumeType != nil {
-			volumeType = volume.VolumeType
-		} else {
-			volumeType = "unknown"
-		}
-		// Try derive the associated project
-		var volumeProject interface{}
-		if p, ok := o.projects[volume.OsVolTenantAttrTenantID]; ok {
-			volumeProject = p.Name
-		} else {
-			volumeProject = "unknown"
-		}
-
-		tags := tagMap{
-			"volumeName": volume.Name.(string),
-			"volumeID":   volume.ID,
-			"project":    volumeProject.(string),
-			"volumeType": volumeType.(string),
-			"status":     volume.Status,
-			"zone":       volume.AvailabilityZone,
-		}
-
-		fields := fieldMap{
-			"size_gb": volume.Size,
-		}
-		acc.AddFields("openstack_volume", fields, tags)
-		// if volumes has snapshot add metric of it
-		numSnapshots = 0
-		for _, snapshot := range snapshots {
-			if snapshot.VolumeID == volume.ID {
-				numSnapshots++
-			}
-		}
-		if numSnapshots != 0 {
-			acc.AddFields("openstack_volume", fieldMap{
-				"num_snapshots": numSnapshots,
-			}, tags)
-		}
-	}
-}
-
 // accumulateStoragePools accumulates statistics about storage pools.
 func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) {
 
@@ -486,6 +526,40 @@ func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) {
 			"max_over_subscription_ratio": overcommit,
 		}
 		acc.AddFields("openstack_storage_pool", fields, tags)
+	}
+}
+
+//
+func (o *OpenStack) accumulateVolumeProjectQuotas(acc telegraf.Accumulator) {
+	for _, p := range o.projects {
+		if p.Name == "service" {continue}
+		blockstorageQuotas, err := blockstorageQuotas.Detail(o.volumeClient, p.ID)
+		if err != nil {
+		} else {
+			if (blockstorageQuotas.Volumes.Limit == -1) {
+				blockstorageQuotas.Volumes.Limit = 99999
+			}
+			if (blockstorageQuotas.Gigabytes.Limit == -1) {
+				blockstorageQuotas.Gigabytes.Limit = 99999
+			}
+			if (blockstorageQuotas.Snapshots.Limit == -1) {
+				blockstorageQuotas.Snapshots.Limit = 99999
+			}
+			acc.AddFields("openstack_storage", fieldMap{
+				"volumes_limit":              blockstorageQuotas.Volumes.Limit,
+				"volumes_allocated":          blockstorageQuotas.Volumes.Allocated,
+				"volumes_inUse":              blockstorageQuotas.Volumes.InUse,
+				"volumes_limit_gb":           blockstorageQuotas.Gigabytes.Limit,
+				"volumes_inUse_gb":           blockstorageQuotas.Gigabytes.InUse,
+				"volummes_allocated_gb":      blockstorageQuotas.Gigabytes.Allocated,
+				"volumes_snapshot_limit":     blockstorageQuotas.Snapshots.Limit,
+				"volumes_snapshot_inUse":     blockstorageQuotas.Snapshots.InUse,
+				"volumes_snapshot_allocated": blockstorageQuotas.Snapshots.Allocated,
+			}, tagMap{
+				"region":  o.Region,
+				"project": p.Name,
+			})
+		}
 	}
 }
 
@@ -515,7 +589,6 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 		"group":         o.gatherGroups,
 		"hypervisors":   o.gatherHypervisors,
 		"storage pools": o.gatherStoragePools,
-		"volumes":       o.gatherVolumes,
 	}
 
 	for resources, gatherer := range gatherers {
@@ -528,19 +601,20 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 		o.accumulateIdentity,
 		o.accumulateComputeAgents,
 		o.accumulateComputeHypervisors,
+		o.accumulateComputeProjectQuotas,
 		o.accumulateNetworkAgents,
 		o.accumulateNetworkFloatingIP,
 		o.accumulateNetworkNET,
 		o.accumulateNetworkIp,
+		o.accumulateNetworkProjectQuotas,
 		o.accumulateVolumeAgents,
 		o.accumulateVolumeStoragePools,
-		o.accumulateVolumesPerTenant,
+		o.accumulateVolumeProjectQuotas,
 	}
 	for _, accumulator := range accumulators {
 		//go routine in here
 		accumulator(acc)
 	}
-
 	return nil
 }
 
