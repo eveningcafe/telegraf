@@ -22,27 +22,24 @@ func TestOpenstackInReal(t *testing.T) {
 	plugin := &plugin.OpenStack{
 		IdentityEndpoint: "http://controller:5000/v3",
 		Project: "admin",
-		Domain: "default",
+		UserDomainID: "default",
+		ProjectDomainID: "default",
 		Password: "Welcome123",
 		Username: "admin",
+		Region: "RegionOne",
 	}
-	metricName := "metricName"
-
-
+	//metricName := "openstack"
 	var acc testutil.Accumulator
 
-	//for i := 0; i < 10; i++ {
-	//	acc.GatherError(plugin.Gather)
-	//}
 	require.NoError(t, acc.GatherError(plugin.Gather))
-
-	require.Len(t, acc.Metrics, 1)
-
-	// basic check to see if we got the right field, value and tag
-	var metric = acc.Metrics[0]
-	require.Equal(t, metric.Measurement, metricName)
-	require.Len(t, acc.Metrics[0].Fields, 1)
-	require.Equal(t, acc.Metrics[0].Fields["a"], 1.2)
+	//
+	//require.Len(t, acc.Metrics, 1)
+	//
+	//// basic check to see if we got the right field, value and tag
+	//var metric = acc.Metrics[0]
+	////require.Equal(t, metric.Measurement, metricName)
+	////require.Len(t, acc.Metrics[0].Fields, 1)
+	////require.Equal(t, acc.Metrics[0].Fields["a"], 1.2)
 }
 //
 //func TestHTTPHeaders(t *testing.T) {
