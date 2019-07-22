@@ -5,7 +5,7 @@ import (
 	v2 "github.com/influxdata/telegraf/plugins/inputs/openstack/api/compute/v2"
 )
 
-type Service struct{
+type Service struct {
 	ID             int    `json:"id"`
 	Binary         string `json:"binary"`
 	DisabledReason string `json:"disabled_reason"`
@@ -16,22 +16,26 @@ type Service struct{
 	ForcedDown     bool   `json:"forced_down"`
 	Zone           string `json:"zone"`
 }
+
 func List(client *v2.ComputeClient) ([]Service, error) {
 	api, err := declareListService(client.Endpoint, client.Token)
 	err = client.DoReuest(api)
+	if (err != nil) {
+		return nil, err
+	}
 	result := ListServiceResponse{}
-	err = json.Unmarshal([]byte(api.ResponseBody),&result)
+	err = json.Unmarshal([]byte(api.ResponseBody), &result)
 	services := []Service{}
 	for _, v := range result.Services {
 		services = append(services, Service{
-			ID: v.ID,
-			Binary: v.Binary,
+			ID:             v.ID,
+			Binary:         v.Binary,
 			DisabledReason: v.DisabledReason,
-			Host: v.Host,
-			State: v.State,
-			UpdatedAt: v.UpdatedAt,
-			ForcedDown: v.ForcedDown,
-			Zone: v.Zone,
+			Host:           v.Host,
+			State:          v.State,
+			UpdatedAt:      v.UpdatedAt,
+			ForcedDown:     v.ForcedDown,
+			Zone:           v.Zone,
 		})
 	}
 	return services, err

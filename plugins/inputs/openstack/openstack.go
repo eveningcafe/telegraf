@@ -104,6 +104,9 @@ type OpenStack struct {
 	projects     projectMap
 	hypervisors  hypervisorMap
 	storagePools storagePoolMap
+
+	// use True only in test
+	skipInitialize  bool
 }
 
 // SampleConfig return a sample configuration file for auto-generation and
@@ -579,9 +582,13 @@ func gather(f func() error) (err error) {
 	return f()
 }
 func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
-	// Perform any required set up
-	if err := o.initialize(); err != nil {
-		return err
+	var err error
+	if o.skipInitialize != false {
+		// Perform any required set up
+		err = o.initialize()
+		if err !=nil {
+			return err
+		}
 	}
 	// Gather resources.  Note tags harvesting must come first as the other
 	// gatherers are dependant on this information.
