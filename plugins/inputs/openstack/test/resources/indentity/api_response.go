@@ -1,5 +1,7 @@
 package indentity
 
+import "github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources"
+
 func CreateTokenResponseBody(keystoneEndpoint string, novaEndpoint string, cinderEndpoint string,neutronEndpoint string ) string {
 	return `
 {
@@ -200,7 +202,28 @@ func ServiceListResponseBody()  string{
 
 func ProjectListResponseBody() string{
 	return `
-{"links":{"next":null,"self":"https://controller:5000/v3/projects","previous":null},"projects":[{"id":"33b03d1e28404ce68c8cf8c91506465b","name":"demo","domain_id":"default","description":"Demo Project","enabled":true,"parent_id":"default","is_domain":false,"tags":[],"links":{"self":"https://controller:5000/v3/projects/33b03d1e28404ce68c8cf8c91506465b"}},{"id":"710cf58ef58445fd9acee15ee7b2e876","name":"service","domain_id":"default","description":"Service Project","enabled":true,"parent_id":"default","is_domain":false,"tags":[],"links":{"self":"https://controller:5000/v3/projects/710cf58ef58445fd9acee15ee7b2e876"}},{"id":"7e985781250646e781010e3a31364590","name":"admin","domain_id":"default","description":"Bootstrap project for initializing the cloud.","enabled":true,"parent_id":"default","is_domain":false,"tags":[],"links":{"self":"https://controller:5000/v3/projects/7e985781250646e781010e3a31364590"}}]}
+{
+  "links": {
+    "next": null,
+    "self": "https://controller:5000/v3/projects",
+    "previous": null
+  },
+  "projects": [
+    {
+      "id": "`+resources.ProjectId+`",
+      "name": "`+resources.ProjectName+`",
+      "domain_id": "`+resources.Domain_id+`",
+      "description": "Demo Project",
+      "enabled": true,
+      "parent_id": "default",
+      "is_domain": false,
+      "tags": [],
+      "links": {
+        "self": "https://controller:5000/v3/projects/33b03d1e28404ce68c8cf8c91506465b"
+      }
+    }
+  ]
+}
 `
 }
 

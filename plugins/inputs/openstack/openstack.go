@@ -252,13 +252,13 @@ func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
 	} else {
 		for _, hypervisor := range hypervisors {
 			fields := fieldMap{
-				"memory_mb_total":     hypervisor.MemoryMB,
-				"memory_mb_used":      hypervisor.MemoryMBUsed,
-				"running_vms":         hypervisor.RunningVMs,
-				"vcpus_total":         hypervisor.VCPUs,
-				"vcpus_used":          hypervisor.VCPUsUsed,
-				"local_disk_avalable": hypervisor.LocalGB,
-				"local_disk_usage":    hypervisor.LocalGBUsed,
+				"memory_mb_total":     hypervisor.MemoryMb,
+				"memory_mb_used":      hypervisor.MemoryMbUsed,
+				"running_vms":         hypervisor.RunningVms,
+				"vcpus_total":         hypervisor.Vcpus,
+				"vcpus_used":          hypervisor.VcpusUsed,
+				"local_disk_avalable": hypervisor.LocalGb,
+				"local_disk_usage":    hypervisor.LocalGbUsed,
 			}
 			acc.AddFields("openstack_compute", fields, tagMap{
 				"name":   hypervisor.HypervisorHostname,
@@ -553,9 +553,9 @@ func (o *OpenStack) accumulateVolumeProjectQuotas(acc telegraf.Accumulator) {
 				"volumes_limit_gb":           blockstorageQuotas.Gigabytes.Limit,
 				"volumes_inUse_gb":           blockstorageQuotas.Gigabytes.InUse,
 				"volummes_allocated_gb":      blockstorageQuotas.Gigabytes.Allocated,
-				"volumes_snapshot_limit":     blockstorageQuotas.Snapshots.Limit,
-				"volumes_snapshot_inUse":     blockstorageQuotas.Snapshots.InUse,
-				"volumes_snapshot_allocated": blockstorageQuotas.Snapshots.Allocated,
+				"snapshot_limit":     blockstorageQuotas.Snapshots.Limit,
+				"snapshot_inUse":     blockstorageQuotas.Snapshots.InUse,
+				"snapshot_allocated": blockstorageQuotas.Snapshots.Allocated,
 			}, tagMap{
 				"region":  o.Region,
 				"project": p.Name,

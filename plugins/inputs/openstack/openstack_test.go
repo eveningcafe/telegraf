@@ -2,7 +2,11 @@ package openstack_test
 
 import (
 	"github.com/influxdata/telegraf/internal/tls"
+	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources"
+	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/blockstorage"
+	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/compute"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/indentity"
+	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/networking"
 	"log"
 	"net"
 	"net/http"
@@ -24,7 +28,7 @@ func TestOpenstackInReal(t *testing.T) {
 		Password:         "Welcome123",
 		Username:         "admin",
 		Region:           "RegionOne",
-		ServicesGather:   []string{"identity", "volumev3"},
+		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
 		ClientConfig: tls.ClientConfig{
 			InsecureSkipVerify: false,
 			TLSCA:              "test/resources/openstack.crt"},
@@ -52,7 +56,7 @@ func TestOpenStackCluster(t *testing.T) {
 	fakeCinderEndpoint := "http://127.0.0.1:8776"
 	fakeNeutronEndpoint := "http://127.0.0.1:9696"
 
-	//try listen on server run unit test
+	//try to listen on server which run unit test
 	fakeKeystoneListen, err = net.Listen("tcp", fakeKeystoneEndpoint[7:])
 	fakeNovaListen, err = net.Listen("tcp", fakeNovaEndpoint[7:])
 	fakeCinderListen, err = net.Listen("tcp", fakeCinderEndpoint[7:])
@@ -61,7 +65,7 @@ func TestOpenStackCluster(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	// fake openstack api
 	fakeKeystoneServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/auth/tokens" {
 			if r.Method == "POST" {
@@ -100,13 +104,10 @@ func TestOpenStackCluster(t *testing.T) {
 		} else if r.URL.Path == "/groups" {
 			if r.Method == "GET" {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(indentity.ProjectListResponseBody()))
+				_, _ = w.Write([]byte(indentity.GroupListResponseBody()))
 			} else {
 				w.WriteHeader(http.StatusForbidden)
 			}
-
-		} else if r.URL.Path == "/services" {
-
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -116,7 +117,28 @@ func TestOpenStackCluster(t *testing.T) {
 	defer fakeKeystoneServer.Close()
 
 	fakeNovaServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/auth/tokens" {
+		if r.URL.Path == "/os-services" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(compute.ServiceListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/os-hypervisors/detail" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(compute.HypervisorsListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+
+		} else if r.URL.Path == "/os-quota-sets/"+resources.ProjectId+"/detail" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(compute.QuotasListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -126,7 +148,28 @@ func TestOpenStackCluster(t *testing.T) {
 	defer fakeNovaServer.Close()
 
 	fakeCinderServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/auth/tokens" {
+		if r.URL.Path == "/os-services" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(blockstorage.ServiceListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/scheduler-stats/get_pools" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(blockstorage.StoragePoolListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/os-quota-sets/"+resources.ProjectId {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(blockstorage.QuotasListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -136,7 +179,42 @@ func TestOpenStackCluster(t *testing.T) {
 	defer fakeCinderServer.Close()
 
 	fakeNeutronServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/auth/tokens" {
+		if r.URL.Path == "/v2.0/agents" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(networking.AgentsListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/v2.0/floatingips" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(networking.FloatingIpsListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/v2.0/networks" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(networking.NetworkListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/v2.0/network-ip-availabilities" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(networking.IpAvailabilityListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+
+		} else if r.URL.Path == "/v2.0/quotas/"+resources.ProjectId+"/details.json" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(networking.QuotasListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -148,6 +226,7 @@ func TestOpenStackCluster(t *testing.T) {
 	plugin := &plugin.OpenStack{
 		IdentityEndpoint: fakeKeystoneServer.URL,
 		Region:           "RegionOne",
+		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
 		ClientConfig: tls.ClientConfig{
 			InsecureSkipVerify: false,
 			TLSCA:              "test/resources/openstack.crt"},
@@ -155,6 +234,8 @@ func TestOpenStackCluster(t *testing.T) {
 
 	var acc testutil.Accumulator
 	require.NoError(t, acc.GatherError(plugin.Gather))
+	var metric = acc.Metrics[0]
+	require.Equal(t, metric.Measurement, "asd")
 
 }
 

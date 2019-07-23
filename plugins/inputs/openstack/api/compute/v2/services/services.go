@@ -27,16 +27,7 @@ func List(client *v2.ComputeClient) ([]Service, error) {
 	err = json.Unmarshal([]byte(api.ResponseBody), &result)
 	services := []Service{}
 	for _, v := range result.Services {
-		services = append(services, Service{
-			ID:             v.ID,
-			Binary:         v.Binary,
-			DisabledReason: v.DisabledReason,
-			Host:           v.Host,
-			State:          v.State,
-			UpdatedAt:      v.UpdatedAt,
-			ForcedDown:     v.ForcedDown,
-			Zone:           v.Zone,
-		})
+		services = append(services,v)
 	}
 	return services, err
 }
