@@ -60,9 +60,7 @@ var sampleConfig = `
     "compute"
   ]
   ## Optional TLS Config
-  # tls_ca = "/etc/telegraf/ca.pem"
-  # tls_cert = "/etc/telegraf/cert.pem"
-  # tls_key = "/etc/telegraf/key.pem"
+  # tls_ca = "/etc/telegraf/openstack.crt"
   ## Use TLS but skip chain & host verification
   # insecure_skip_verify = false
 `
@@ -122,9 +120,7 @@ func (o *OpenStack) Description() string {
 
 // initialize performs any necessary initialization functions
 func (o *OpenStack) initialize() error {
-	o.ClientConfig.t
 	tlsCfg, err := o.ClientConfig.TLSConfig()
-	fmt.Println(tlsCfg)
 	// Authenticate against Keystone and get a token provider
 	provider, err := authenticator.AuthenticatedClient(authenticator.AuthOption{
 		AuthURL:         o.IdentityEndpoint,
@@ -133,6 +129,8 @@ func (o *OpenStack) initialize() error {
 		Username:        o.Username,
 		Password:        o.Password,
 		Project_name:    o.Project,
+		TlsCfg:          tlsCfg,
+
 	})
 	if err != nil {
 		return fmt.Errorf("Unable to authenticate OpenStack user: %v", err)
@@ -585,9 +583,8 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	if err := o.initialize(); err != nil {
 		return err
 	}
-	// Gather resources.  Note service harvesting must come first as the other
+	// Gather resources.  Note tags harvesting must come first as the other
 	// gatherers are dependant on this information.
-
 	gatherers := map[string]func() error{
 		"services":      o.gatherServices,
 		"projects":      o.gatherProjects,

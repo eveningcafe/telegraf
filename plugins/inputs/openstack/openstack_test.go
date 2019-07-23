@@ -1,6 +1,7 @@
 package openstack_test
 
 import (
+	"github.com/influxdata/telegraf/internal/tls"
 	"testing"
 
 	plugin "github.com/influxdata/telegraf/plugins/inputs/openstack"
@@ -20,13 +21,16 @@ func TestOpenstackInReal(t *testing.T) {
 	//
 	//url := fakeServer.URL + "/endpoint"
 	plugin := &plugin.OpenStack{
-		IdentityEndpoint: "http://controller:5000/v3",
+		IdentityEndpoint: "https://controller:5000/v3",
 		Project: "admin",
 		UserDomainID: "default",
 		ProjectDomainID: "default",
 		Password: "Welcome123",
 		Username: "admin",
 		Region: "RegionOne",
+		ClientConfig : tls.ClientConfig{
+			InsecureSkipVerify: false,
+			TLSCA: "/tmp/openstack.crt"},
 	}
 	//metricName := "openstack"
 	var acc testutil.Accumulator

@@ -3,6 +3,7 @@ package v3
 import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/api/base"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/api/identity/v3/authenticator"
+
 )
 
 type IdentityClient struct {

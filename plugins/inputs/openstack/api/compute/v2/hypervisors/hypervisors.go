@@ -91,10 +91,10 @@ type Hypervisor struct {
 }
 
 func List(client *v2.ComputeClient) ([]Hypervisor, error) {
-	apiList, err := declareListHypervisor(client.Endpoint, client.Token)
-	err = apiList.DoReuest()
+	api, err := declareListHypervisor(client.Endpoint, client.Token)
+	err = client.DoReuest(api)
 	result := ListHypervisorResponse{}
-	err = json.Unmarshal([]byte(apiList.ResponseBody),&result)
+	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	hypervisors := []Hypervisor{}
 	for _, v := range result.Hypervisors {
 		hypervisors = append(hypervisors, Hypervisor{

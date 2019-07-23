@@ -35,7 +35,7 @@ type Capabilities struct {
 
 func ListPool(client *v3.VolumeClient) ([]StoragePool, error) {
 	api, err := declareListPool(client.Endpoint, client.Token)
-	err = api.DoReuest()
+	err = client.DoReuest(api)
 	result := ListPoolResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody), &result)
 	pools := []StoragePool{}

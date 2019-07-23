@@ -62,7 +62,7 @@ type IPAvailabilities struct {
 
 func List(client *v2.NetworkClient) ([]Network, error) {
 	api, err := declareListNetwork(client.Endpoint, client.Token)
-	err = api.DoReuest()
+	err = client.DoReuest(api)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func List(client *v2.NetworkClient) ([]Network, error) {
 
 func NetworkIPAvailabilities(client *v2.NetworkClient) ([]IPAvailabilities, error) {
 	api, err := declareNetworkIPAvailabilities(client.Endpoint, client.Token)
-	err = api.DoReuest()
+	err = client.DoReuest(api)
 	if err != nil {
 		return nil, err
 	}

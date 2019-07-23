@@ -14,16 +14,7 @@ type ListServiceResponse struct {
 		Previous interface{} `json:"previous"`
 		Self     string      `json:"self"`
 	} `json:"links"`
-	Services []struct {
-		Description string `json:"description"`
-		Enabled     bool   `json:"enabled"`
-		ID          string `json:"id"`
-		Links       struct {
-			Self string `json:"self"`
-		} `json:"links"`
-		Name string `json:"name"`
-		Type string `json:"type"`
-	} `json:"services"`
+	Services [] Service `json:"services"`
 }
 
 

@@ -86,7 +86,7 @@ type Quota struct {
 
 func Detail(client *v2.ComputeClient, projectID string) (Quota, error) {
 	api, err := declareQuotasDetail(client.Endpoint, client.Token, projectID)
-	err = api.DoReuest()
+	err = client.DoReuest(api)
 	if err != nil {
 		return Quota{}, err
 	}

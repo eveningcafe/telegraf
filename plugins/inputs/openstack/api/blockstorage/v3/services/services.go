@@ -20,7 +20,7 @@ type Service struct {
 
 func List(client *v3.VolumeClient) ([]Service, error) {
 	api, err := declareListService(client.Endpoint, client.Token)
-	err = api.DoReuest()
+	err = client.DoReuest(api)
 	result := ListServiceResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	services := []Service{}

@@ -1,12 +1,5 @@
 package request
 
-import (
-	"bytes"
-	"errors"
-	"io/ioutil"
-	"net/http"
-)
-
 // request type struct depent on format data in, respone is json data in responebody
 
 const (
@@ -26,40 +19,45 @@ type OpenstackAPI struct {
 	
 }
 // change ResponseBody arr of openstack,
-func (o *OpenstackAPI) DoReuest() (error) {
-	var request *http.Request
-	var err error
-	httpClient := &http.Client{}
-	if(o.RequestBodyRequire == true){
-		request, err = http.NewRequest(o.Method, o.Endpoint+o.Path, bytes.NewBuffer(o.RequestBody))
-	}else{
-		request, err = http.NewRequest(o.Method, o.Endpoint+o.Path, nil)
-	}
-
-	if(o.RequestParameterRequire == true){
-		q := request.URL.Query()
-		for k, v := range o.RequestParameter {
-			q.Add(k,v)
-		}
-		request.URL.RawQuery = q.Encode()
-	}
-	if (err != nil ){
-		return errors.New("bad request to "+request.URL.Path+" fail to normalized input")
-	}
-	for k, v := range o.RequestHeader {
-		request.Header.Add(k,v)
-	}
-	resp, err := httpClient.Do(request)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
-	} else {
-		err = errors.New("RequestBody to "+request.URL.Path+"Respond status code "+ string(resp.StatusCode))
-		return err
-	}
-	o.ResponseHeader = resp.Header
-	o.ResponseBody, err = ioutil.ReadAll(resp.Body)
-	return  err
-}
+//func (o *OpenstackAPI) DoReuest() (error) {
+//	var request *http.Request
+//	var err error
+//	//tr := &http.Transport{
+//	//	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+//	//}
+//	//httpClient := &http.Client{
+//	//	Transport: tr,
+//	//}
+//	if(o.RequestBodyRequire == true){
+//		request, err = http.NewRequest(o.Method, o.Endpoint+o.Path, bytes.NewBuffer(o.RequestBody))
+//	}else{
+//		request, err = http.NewRequest(o.Method, o.Endpoint+o.Path, nil)
+//	}
+//
+//	if(o.RequestParameterRequire == true){
+//		q := request.URL.Query()
+//		for k, v := range o.RequestParameter {
+//			q.Add(k,v)
+//		}
+//		request.URL.RawQuery = q.Encode()
+//	}
+//	if (err != nil ){
+//		return errors.New("bad request to "+request.URL.Path+" fail to normalized input")
+//	}
+//	for k, v := range o.RequestHeader {
+//		request.Header.Add(k,v)
+//	}
+//	resp, err := o.HTTPClient.Do(request)
+//	if err != nil {
+//		return err
+//	}
+//	defer resp.Body.Close()
+//	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+//	} else {
+//		err = errors.New("RequestBody to "+request.URL.Path+"Respond status code "+ string(resp.StatusCode))
+//		return err
+//	}
+//	o.ResponseHeader = resp.Header
+//	o.ResponseBody, err = ioutil.ReadAll(resp.Body)
+//	return  err
+//}
