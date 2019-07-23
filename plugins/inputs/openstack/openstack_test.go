@@ -1,18 +1,18 @@
 package openstack_test
 
 import (
-	"fmt"
 	"github.com/influxdata/telegraf/internal/tls"
+	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/indentity"
+	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	plugin "github.com/influxdata/telegraf/plugins/inputs/openstack"
 	"github.com/influxdata/telegraf/testutil"
-	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources"
 	"github.com/stretchr/testify/require"
 )
-
 
 func TestOpenstackInReal(t *testing.T) {
 
@@ -24,6 +24,7 @@ func TestOpenstackInReal(t *testing.T) {
 		Password:         "Welcome123",
 		Username:         "admin",
 		Region:           "RegionOne",
+		ServicesGather:   []string{"identity", "volumev3"},
 		ClientConfig: tls.ClientConfig{
 			InsecureSkipVerify: false,
 			TLSCA:              "test/resources/openstack.crt"},
@@ -41,23 +42,119 @@ func TestOpenstackInReal(t *testing.T) {
 }
 
 func TestOpenStackCluster(t *testing.T) {
-	header := "X-Special-Header"
-	headerValue := "Special-Value"
-	fakeKeystone := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,  r *http.Request) {
-		if r.URL.Path == "/v3" {
-			if r.Header.Get(header) == headerValue {
-				_, _ = w.Write([]byte(resources.GetTokenResponseBody))
+	var err error
+	var fakeKeystoneListen net.Listener
+	var fakeNovaListen net.Listener
+	var fakeCinderListen net.Listener
+	var fakeNeutronListen net.Listener
+	fakeKeystoneEndpoint := "http://127.0.0.1:5000"
+	fakeNovaEndpoint := "http://127.0.0.1:8774"
+	fakeCinderEndpoint := "http://127.0.0.1:8776"
+	fakeNeutronEndpoint := "http://127.0.0.1:9696"
+
+	//try listen on server run unit test
+	fakeKeystoneListen, err = net.Listen("tcp", fakeKeystoneEndpoint[7:])
+	fakeNovaListen, err = net.Listen("tcp", fakeNovaEndpoint[7:])
+	fakeCinderListen, err = net.Listen("tcp", fakeCinderEndpoint[7:])
+	fakeNeutronListen, err = net.Listen("tcp", fakeNeutronEndpoint[7:])
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fakeKeystoneServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/tokens" {
+			if r.Method == "POST" {
+				w.Header().Set("X-Subject-Token", "Special-Test-Token")
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(
+					indentity.CreateTokenResponseBody(
+						fakeKeystoneEndpoint,
+						fakeNovaEndpoint,
+						fakeCinderEndpoint,
+						fakeNeutronEndpoint)))
 			} else {
 				w.WriteHeader(http.StatusForbidden)
 			}
+		} else if r.URL.Path == "/services" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(indentity.ServiceListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/projects" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(indentity.ProjectListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/users" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(indentity.UserListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/groups" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(indentity.ProjectListResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+
+		} else if r.URL.Path == "/services" {
+
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	defer fakeKeystone.Close()
+	fakeKeystoneServer.Listener = fakeKeystoneListen
+	fakeKeystoneServer.Start()
+	defer fakeKeystoneServer.Close()
 
-	keystoneUrl := fakeKeystone.URL + "/v3"
-	fmt.Printf(keystoneUrl)
+	fakeNovaServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/tokens" {
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	fakeNovaServer.Listener = fakeNovaListen
+	fakeNovaServer.Start()
+	defer fakeNovaServer.Close()
+
+	fakeCinderServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/tokens" {
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	fakeCinderServer.Listener = fakeCinderListen
+	fakeCinderServer.Start()
+	defer fakeCinderServer.Close()
+
+	fakeNeutronServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/tokens" {
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	fakeNeutronServer.Listener = fakeNeutronListen
+	fakeNeutronServer.Start()
+	defer fakeNeutronServer.Close()
+
+	plugin := &plugin.OpenStack{
+		IdentityEndpoint: fakeKeystoneServer.URL,
+		Region:           "RegionOne",
+		ClientConfig: tls.ClientConfig{
+			InsecureSkipVerify: false,
+			TLSCA:              "test/resources/openstack.crt"},
+	}
+
+	var acc testutil.Accumulator
+	require.NoError(t, acc.GatherError(plugin.Gather))
 
 }
 

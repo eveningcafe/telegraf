@@ -2,6 +2,7 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/influxdata/telegraf/filter"
 	"github.com/influxdata/telegraf/internal/tls"
 	"log"
 	"strconv"
@@ -73,10 +74,6 @@ type serviceMap map[string]services.Service
 type projectMap map[string]projects.Project
 type userMap map[string]users.User
 type groupMap map[string]groups.Group
-type hypervisorMap map[string]computeHypervisors.Hypervisor
-
-// storagePoolMap maps a storage pool name to a StoragePool struct.
-type storagePoolMap map[string]blockstorageScheduler.StoragePool
 
 // OpenStack is the main structure associated with a collection instance.
 type OpenStack struct {
@@ -87,9 +84,12 @@ type OpenStack struct {
 	Project          string
 	Username         string
 	Password         string
-	Services_gather  []string
 	Region           string
+	ServicesGather   []string
 	tls.ClientConfig
+
+	//filter service
+	filter filter.Filter
 
 	// Locally cached clients
 	identityClient *identity.IdentityClient
@@ -98,15 +98,13 @@ type OpenStack struct {
 	networkClient  *networking.NetworkClient
 
 	// Locally cached resources
-	services     serviceMap
-	users        userMap
-	groups       groupMap
-	projects     projectMap
-	hypervisors  hypervisorMap
-	storagePools storagePoolMap
+	services serviceMap
+	users    userMap
+	groups   groupMap
+	projects projectMap
 
 	// use True only in test
-	skipInitialize  bool
+	skipInitialize bool
 }
 
 // SampleConfig return a sample configuration file for auto-generation and
@@ -133,24 +131,31 @@ func (o *OpenStack) initialize() error {
 		Password:        o.Password,
 		Project_name:    o.Project,
 		TlsCfg:          tlsCfg,
-
 	})
+
 	if err != nil {
 		return fmt.Errorf("Unable to authenticate OpenStack user: %v", err)
 	}
 	// Create required clients and attach to the OpenStack struct
-	if o.identityClient, err = identity.NewIdentityV3(*provider, o.Region); err != nil {
-		return fmt.Errorf("unable to create V3 identity client: %v", err)
+	if o.filter.Match("identity") {
+		if o.identityClient, err = identity.NewIdentityV3(*provider, o.Region); err != nil {
+			return fmt.Errorf("unable to create V3 identity client: %v", err)
+		}
 	}
-	if o.computeClient, err = compute.NewComputeV2(*provider, o.Region); err != nil {
-		return fmt.Errorf("unable to create V2 compute client: %v", err)
+	if o.filter.Match("compute") {
+		if o.computeClient, err = compute.NewComputeV2(*provider, o.Region); err != nil {
+			return fmt.Errorf("unable to create V2 compute client: %v", err)
+		}
 	}
-	if o.volumeClient, err = blockstorage.NewBlockStorageV3(*provider, o.Region); err != nil {
-		return fmt.Errorf("unable to create V3 block storage client: %v", err)
+	if o.filter.Match("volumev3") {
+		if o.volumeClient, err = blockstorage.NewBlockStorageV3(*provider, o.Region); err != nil {
+			return fmt.Errorf("unable to create V3 block storage client: %v", err)
+		}
 	}
-
-	if o.networkClient, err = networking.NewNetworkClientV2(*provider, o.Region); err != nil {
-		return fmt.Errorf("unable to create V3 networking client: %v", err)
+	if o.filter.Match("network") {
+		if o.networkClient, err = networking.NewNetworkClientV2(*provider, o.Region); err != nil {
+			return fmt.Errorf("unable to create V3 networking client: %v", err)
+		}
 	}
 
 	// Initialize resource maps and slices
@@ -158,21 +163,7 @@ func (o *OpenStack) initialize() error {
 	o.projects = projectMap{}
 	o.users = userMap{}
 	o.groups = groupMap{}
-	o.hypervisors = hypervisorMap{}
-	o.storagePools = storagePoolMap{}
 
-	return err
-}
-
-// gatherHypervisors collects hypervisors from the OpenStack API.
-func (o *OpenStack) gatherHypervisors() error {
-	hypervisors, err := computeHypervisors.List(o.computeClient)
-	if err != nil {
-		return fmt.Errorf("unable to extract hypervisors: %v", err)
-	}
-	for _, hypervisor := range hypervisors {
-		o.hypervisors[hypervisor.ID] = hypervisor
-	}
 	return err
 }
 
@@ -223,18 +214,6 @@ func (o *OpenStack) gatherGroups() error {
 	return err
 }
 
-// gather storage per pool
-func (o *OpenStack) gatherStoragePools() error {
-	storagePools, err := blockstorageScheduler.ListPool(o.volumeClient)
-	if err != nil {
-		return fmt.Errorf("unable to list storage pools: %v", err)
-	}
-	for _, storagePool := range storagePools {
-		o.storagePools[storagePool.Name] = storagePool
-	}
-	return err
-}
-
 //
 func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
 	agents, err := computeServices.List(o.computeClient)
@@ -267,27 +246,34 @@ func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
 
 // accumulateHypervisors accumulates statistics from hypervisors.
 func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
-	for _, hypervisor := range o.hypervisors {
-		fields := fieldMap{
-			"memory_mb_total":     hypervisor.MemoryMB,
-			"memory_mb_used":      hypervisor.MemoryMBUsed,
-			"running_vms":         hypervisor.RunningVMs,
-			"vcpus_total":         hypervisor.VCPUs,
-			"vcpus_used":          hypervisor.VCPUsUsed,
-			"local_disk_avalable": hypervisor.LocalGB,
-			"local_disk_usage":    hypervisor.LocalGBUsed,
+	hypervisors, err := computeHypervisors.List(o.computeClient)
+	if err != nil {
+
+	} else {
+		for _, hypervisor := range hypervisors {
+			fields := fieldMap{
+				"memory_mb_total":     hypervisor.MemoryMB,
+				"memory_mb_used":      hypervisor.MemoryMBUsed,
+				"running_vms":         hypervisor.RunningVMs,
+				"vcpus_total":         hypervisor.VCPUs,
+				"vcpus_used":          hypervisor.VCPUsUsed,
+				"local_disk_avalable": hypervisor.LocalGB,
+				"local_disk_usage":    hypervisor.LocalGBUsed,
+			}
+			acc.AddFields("openstack_compute", fields, tagMap{
+				"name":   hypervisor.HypervisorHostname,
+				"region": o.Region,
+			})
 		}
-		acc.AddFields("openstack_compute", fields, tagMap{
-			"name":   hypervisor.HypervisorHostname,
-			"region": o.Region,
-		})
 	}
 }
 
 //
 func (o *OpenStack) accumulateComputeProjectQuotas(acc telegraf.Accumulator) {
 	for _, p := range o.projects {
-		if p.Name == "service" {continue}
+		if p.Name == "service" {
+			continue
+		}
 		computeQuotas, err := computeQuotas.Detail(o.computeClient, p.ID)
 		if err != nil {
 		} else {
@@ -448,7 +434,9 @@ func (o *OpenStack) accumulateNetworkIp(acc telegraf.Accumulator) {
 func (o *OpenStack) accumulateNetworkProjectQuotas(acc telegraf.Accumulator) {
 
 	for _, p := range o.projects {
-		if p.Name == "service" {continue}
+		if p.Name == "service" {
+			continue
+		}
 		netQuotas, err := networkingQuotas.Detail(o.networkClient, p.ID)
 		if err != nil {
 		} else {
@@ -517,29 +505,35 @@ func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 
 // accumulateStoragePools accumulates statistics about storage pools.
 func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) {
+	storagePools, err := blockstorageScheduler.ListPool(o.volumeClient)
+	if err != nil {
 
-	for _, storagePool := range o.storagePools {
-		tags := tagMap{
-			"backed_state": storagePool.Capabilities.BackendState,
-			"backend_name": storagePool.Capabilities.VolumeBackendName,
-			"region":       o.Region,
+	} else {
+		for _, storagePool := range storagePools {
+			tags := tagMap{
+				"backed_state": storagePool.Capabilities.BackendState,
+				"backend_name": storagePool.Capabilities.VolumeBackendName,
+				"region":       o.Region,
+			}
+			overcommit, _ := strconv.ParseFloat(storagePool.Capabilities.MaxOverSubscriptionRatio, 64)
+			fields := fieldMap{
+				"total_capacity_gb":           storagePool.Capabilities.TotalCapacityGb,
+				"free_capacity_gb":            storagePool.Capabilities.FreeCapacityGb,
+				"allocated_capacity_gb":       storagePool.Capabilities.AllocatedCapacityGb,
+				"provisioned_capacity_gb":     storagePool.Capabilities.ProvisionedCapacityGb,
+				"max_over_subscription_ratio": overcommit,
+			}
+			acc.AddFields("openstack_storage_pool", fields, tags)
 		}
-		overcommit, _ := strconv.ParseFloat(storagePool.Capabilities.MaxOverSubscriptionRatio, 64)
-		fields := fieldMap{
-			"total_capacity_gb":           storagePool.Capabilities.TotalCapacityGb,
-			"free_capacity_gb":            storagePool.Capabilities.FreeCapacityGb,
-			"allocated_capacity_gb":       storagePool.Capabilities.AllocatedCapacityGb,
-			"provisioned_capacity_gb":     storagePool.Capabilities.ProvisionedCapacityGb,
-			"max_over_subscription_ratio": overcommit,
-		}
-		acc.AddFields("openstack_storage_pool", fields, tags)
 	}
 }
 
 //
 func (o *OpenStack) accumulateVolumeProjectQuotas(acc telegraf.Accumulator) {
 	for _, p := range o.projects {
-		if p.Name == "service" {continue}
+		if p.Name == "service" {
+			continue
+		}
 		blockstorageQuotas, err := blockstorageQuotas.Detail(o.volumeClient, p.ID)
 		if err != nil {
 		} else {
@@ -583,22 +577,22 @@ func gather(f func() error) (err error) {
 }
 func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	var err error
-	if o.skipInitialize != false {
-		// Perform any required set up
-		err = o.initialize()
-		if err !=nil {
-			return err
+	if o.filter == nil {
+		if o.filter, err = filter.Compile(o.ServicesGather); err != nil {
+			return fmt.Errorf("error compiling filter: %s", err)
 		}
 	}
-	// Gather resources.  Note tags harvesting must come first as the other
+
+	if err = o.initialize(); err != nil {
+		log.Println("W!", plugin, "failed to init : ", err)
+	}
+	// Gather resources.  Note tags harvesting must come first
 	// gatherers are dependant on this information.
 	gatherers := map[string]func() error{
-		"services":      o.gatherServices,
-		"projects":      o.gatherProjects,
-		"users":         o.gatherUsers,
-		"group":         o.gatherGroups,
-		"hypervisors":   o.gatherHypervisors,
-		"storage pools": o.gatherStoragePools,
+		"services": o.gatherServices,
+		"projects": o.gatherProjects,
+		"users":    o.gatherUsers,
+		"group":    o.gatherGroups,
 	}
 
 	for resources, gatherer := range gatherers {
@@ -606,21 +600,34 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 			log.Println("W!", plugin, "failed to get", resources, " : ", err)
 		}
 	}
-	// Accumulate statistics
-	accumulators := []func(telegraf.Accumulator){
-		o.accumulateIdentity,
-		o.accumulateComputeAgents,
-		o.accumulateComputeHypervisors,
-		o.accumulateComputeProjectQuotas,
-		o.accumulateNetworkAgents,
-		o.accumulateNetworkFloatingIP,
-		o.accumulateNetworkNET,
-		o.accumulateNetworkIp,
-		o.accumulateNetworkProjectQuotas,
-		o.accumulateVolumeAgents,
-		o.accumulateVolumeStoragePools,
-		o.accumulateVolumeProjectQuotas,
+	// Accumulate statistics . depend on which service will cralw
+
+	accumulators := []func(telegraf.Accumulator){}
+
+	if o.filter.Match("identity") {
+		accumulators = append(accumulators, o.accumulateIdentity)
 	}
+	if o.filter.Match("compute") {
+		accumulators = append(accumulators,
+			o.accumulateComputeAgents,
+			o.accumulateComputeHypervisors,
+			o.accumulateComputeProjectQuotas)
+	}
+	if o.filter.Match("volumev3") {
+		accumulators = append(accumulators,
+			o.accumulateVolumeAgents,
+			o.accumulateVolumeStoragePools,
+			o.accumulateVolumeProjectQuotas)
+	}
+	if o.filter.Match("network") {
+		accumulators = append(accumulators,
+			o.accumulateNetworkAgents,
+			o.accumulateNetworkFloatingIP,
+			o.accumulateNetworkNET,
+			o.accumulateNetworkIp,
+			o.accumulateNetworkProjectQuotas)
+	}
+
 	for _, accumulator := range accumulators {
 		//go routine in here
 		accumulator(acc)
@@ -634,6 +641,7 @@ func init() {
 		return &OpenStack{
 			UserDomainID:    "default",
 			ProjectDomainID: "default",
+			ServicesGather:  []string{},
 		}
 	})
 }
