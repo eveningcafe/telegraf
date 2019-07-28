@@ -7,6 +7,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/compute"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/indentity"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/networking"
+	"github.com/stretchr/testify/assert"
 	"log"
 	"net"
 	"net/http"
@@ -18,32 +19,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOpenstackInReal(t *testing.T) {
-
-	plugin := &plugin.OpenStack{
-		IdentityEndpoint: "https://controller:5000/v3",
-		Project:          "admin",
-		UserDomainID:     "default",
-		ProjectDomainID:  "default",
-		Password:         "Welcome123",
-		Username:         "admin",
-		Region:           "RegionOne",
-		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
-		ClientConfig: tls.ClientConfig{
-			InsecureSkipVerify: false,
-			TLSCA:              "test/resources/openstack.crt"},
-	}
-	//metricName := "openstack"
-	var acc testutil.Accumulator
-
-	require.NoError(t, acc.GatherError(plugin.Gather))
-	//
-	//// basic check to see if we got the right field, value and tag
-	//var metric = acc.Metrics[0]
-	////require.Equal(t, metric.Measurement, metricName)
-	////require.Len(t, acc.Metrics[0].Fields, 1)
-	////require.Equal(t, acc.Metrics[0].Fields["a"], 1.2)
-}
+//func TestOpenstackInReal(t *testing.T) {
+//
+//	plugin := &plugin.OpenStack{
+//		IdentityEndpoint: "https://controller:5000/v3",
+//		Project:          "admin",
+//		UserDomainID:     "default",
+//		ProjectDomainID:  "default",
+//		Password:         "Welcome123",
+//		Username:         "admin",
+//		Region:           "RegionOne",
+//		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
+//		ClientConfig: tls.ClientConfig{
+//			InsecureSkipVerify: false,
+//			TLSCA:              "test/resources/openstack.crt"},
+//	}
+//	var acc testutil.Accumulator
+//	require.NoError(t, acc.GatherError(plugin.Gather))
+//}
 
 func TestOpenStackCluster(t *testing.T) {
 	var err error
@@ -234,9 +227,29 @@ func TestOpenStackCluster(t *testing.T) {
 
 	var acc testutil.Accumulator
 	require.NoError(t, acc.GatherError(plugin.Gather))
-	var metric = acc.Metrics[0]
-	require.Equal(t, metric.Measurement, "asd")
 
+	iFields := map[string]interface{}{
+		"num_projects": 1,
+		"num_servives": 7,
+		"num_users":   7,
+		"num_group":  1,
+	}
+	iTags := map[string]string{
+		"region" : "RegionOne",
+	}
+	acc.AssertContainsTaggedFields(t, "openstack_identity", iFields, iTags)
+
+	//acc.AssertContainsTaggedFields(t, "openstack_compute", map[string]interface{}{
+	//	"api_state": 1,
+	//}, map[string]string{
+	//	"region" : "RegionOne",
+	//})
+	acc.AssertContainsFields(t, "openstack_identity",map[string]interface {}{"api_state":1})
+	acc.AssertContainsFields(t, "openstack_compute", map[string]interface {}{"api_state":1})openstack_volumes openstack_network
+	acc.AssertContainsFields(t, "openstack_volumes", map[string]interface {}{"api_state":1})
+	acc.AssertContainsFields(t, "openstack_network", map[string]interface {}{"api_state":1})
+	assert.Equal(len(acc.Metrics),26)
+	abc := region -> RegionOne
 }
 
 //

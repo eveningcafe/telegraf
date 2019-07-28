@@ -120,7 +120,7 @@ func (o *OpenStack) Description() string {
 }
 
 // initialize performs any necessary initialization functions
-func (o *OpenStack) initialize() error {
+func (o *OpenStack) initialize( ) error {
 	tlsCfg, err := o.ClientConfig.TLSConfig()
 	// Authenticate against Keystone and get a token provider
 	provider, err := authenticator.AuthenticatedClient(authenticator.AuthOption{
@@ -312,7 +312,9 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 		"num_users":    len(o.users),
 		"num_group":    len(o.groups),
 	}
-	acc.AddFields("openstack_identity", fields, tagMap{})
+	acc.AddFields("openstack_identity", fields, tagMap{
+		"region":  o.Region,
+	})
 }
 
 //
