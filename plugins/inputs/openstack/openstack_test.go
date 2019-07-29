@@ -7,7 +7,6 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/compute"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/indentity"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/networking"
-	"github.com/stretchr/testify/assert"
 	"log"
 	"net"
 	"net/http"
@@ -19,24 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//func TestOpenstackInReal(t *testing.T) {
-//
-//	plugin := &plugin.OpenStack{
-//		IdentityEndpoint: "https://controller:5000/v3",
-//		Project:          "admin",
-//		UserDomainID:     "default",
-//		ProjectDomainID:  "default",
-//		Password:         "Welcome123",
-//		Username:         "admin",
-//		Region:           "RegionOne",
-//		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
-//		ClientConfig: tls.ClientConfig{
-//			InsecureSkipVerify: false,
-//			TLSCA:              "test/resources/openstack.crt"},
-//	}
-//	var acc testutil.Accumulator
-//	require.NoError(t, acc.GatherError(plugin.Gather))
-//}
 
 func TestOpenStackCluster(t *testing.T) {
 	var err error
@@ -228,6 +209,12 @@ func TestOpenStackCluster(t *testing.T) {
 	var acc testutil.Accumulator
 	require.NoError(t, acc.GatherError(plugin.Gather))
 
+
+	acc.AssertContainsFields(t, "openstack_identity",map[string]interface {}{"api_state":1})
+	acc.AssertContainsFields(t, "openstack_compute", map[string]interface {}{"api_state":1})
+	acc.AssertContainsFields(t, "openstack_volumes", map[string]interface {}{"api_state":1})
+	acc.AssertContainsFields(t, "openstack_network", map[string]interface {}{"api_state":1})
+
 	iFields := map[string]interface{}{
 		"num_projects": 1,
 		"num_servives": 7,
@@ -239,195 +226,85 @@ func TestOpenStackCluster(t *testing.T) {
 	}
 	acc.AssertContainsTaggedFields(t, "openstack_identity", iFields, iTags)
 
-	//acc.AssertContainsTaggedFields(t, "openstack_compute", map[string]interface{}{
-	//	"api_state": 1,
-	//}, map[string]string{
-	//	"region" : "RegionOne",
-	//})
-	acc.AssertContainsFields(t, "openstack_identity",map[string]interface {}{"api_state":1})
-	acc.AssertContainsFields(t, "openstack_compute", map[string]interface {}{"api_state":1})openstack_volumes openstack_network
-	acc.AssertContainsFields(t, "openstack_volumes", map[string]interface {}{"api_state":1})
-	acc.AssertContainsFields(t, "openstack_network", map[string]interface {}{"api_state":1})
-	assert.Equal(len(acc.Metrics),26)
-	abc := region -> RegionOne
+	cFields := map[string]interface{}{
+		"local_disk_usage": 0,
+		"memory_mb_total": 7976,
+		"memory_mb_used":   512,
+		"running_vms":  0,
+		"vcpus_total": 6,
+		"vcpus_used": 0,
+		"local_disk_avalable": 410,
+	}
+	cTags := map[string]string{
+		"hostname": "compute01",
+		"region" : "RegionOne",
+	}
+	acc.AssertContainsTaggedFields(t, "openstack_compute", cFields, cTags)
+
+	vFields := map[string]interface{}{
+		"snapshot_inUse": 0,
+		"volumes_allocated": 0,
+		"volumes_inUse":   0,
+		"volumes_limit_gb":  1000,
+		"volumes_inUse_gb": 0,
+		"volummes_allocated_gb": 0,
+		"volumes_limit": 10,
+		"snapshot_limit": 10,
+		"snapshot_allocated": 0,
+	}
+	vTags := map[string]string{
+		"project": "demo",
+		"region" : "RegionOne",
+	}
+
+	acc.AssertContainsTaggedFields(t, "openstack_volumes", vFields, vTags)
+	//
+	sFields := map[string]interface{}{
+		"total_capacity_gb": float64(125.03),
+		"free_capacity_gb": float64(125.03),
+		"allocated_capacity_gb":   float64(0),
+		"provisioned_capacity_gb":  float64(0),
+		"max_over_subscription_ratio": float64(20),
+	}
+	sTags := map[string]string{
+		"backend_state": "up",
+		"backend_name": "RBD",
+		"region" : "RegionOne",
+	}
+
+	acc.AssertContainsTaggedFields(t, "openstack_storage_pool", sFields, sTags)
+
+	nFields := map[string]interface{}{
+	   "ip_used": 1,
+		"ip_total": 52,
+    }
+	nTags := map[string]string{
+		"subnet_cidr":"all",
+		"region":"RegionOne",
+		"project":"unknown",
+		"network":"provider",
+	}
+
+	acc.AssertContainsTaggedFields(t, "openstack_network", nFields, nTags)
+
+
 }
 
+//func TestOpenstackInReal(t *testing.T) {
 //
-//func TestHTTPHeaders(t *testing.T) {
-//	header := "X-Special-Header"
-//	headerValue := "Special-Value"
-//	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.RequestBody) {
-//		if r.URL.Path == "/endpoint" {
-//			if r.Header.Get(header) == headerValue {
-//				_, _ = w.Write([]byte(simpleJSON))
-//			} else {
-//				w.WriteHeader(http.StatusForbidden)
-//			}
-//		} else {
-//			w.WriteHeader(http.StatusNotFound)
-//		}
-//	}))
-//	defer fakeServer.Close()
-//
-//	url := fakeServer.URL + "/endpoint"
-//	plugin := &plugin.HTTP{
-//		URLs:    []string{url},
-//		Headers: map[string]string{header: headerValue},
+//	plugin := &plugin.OpenStack{
+//		IdentityEndpoint: "https://controller:5000/v3",
+//		Project:          "admin",
+//		UserDomainID:     "default",
+//		ProjectDomainID:  "default",
+//		Password:         "Welcome123",
+//		Username:         "admin",
+//		Region:           "RegionOne",
+//		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
+//		ClientConfig: tls.ClientConfig{
+//			InsecureSkipVerify: false,
+//			TLSCA:              "test/resources/openstack.crt"},
 //	}
-//
-//	p, _ := parsers.NewParser(&parsers.Config{
-//		DataFormat: "json",
-//		MetricName: "metricName",
-//	})
-//	plugin.SetParser(p)
-//
 //	var acc testutil.Accumulator
-//	plugin.Init()
 //	require.NoError(t, acc.GatherError(plugin.Gather))
-//}
-//
-//func TestInvalidStatusCode(t *testing.T) {
-//	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.RequestBody) {
-//		w.WriteHeader(http.StatusNotFound)
-//	}))
-//	defer fakeServer.Close()
-//
-//	url := fakeServer.URL + "/endpoint"
-//	plugin := &plugin.HTTP{
-//		URLs: []string{url},
-//	}
-//
-//	metricName := "metricName"
-//	p, _ := parsers.NewParser(&parsers.Config{
-//		DataFormat: "json",
-//		MetricName: metricName,
-//	})
-//	plugin.SetParser(p)
-//
-//	var acc testutil.Accumulator
-//	plugin.Init()
-//	require.Error(t, acc.GatherError(plugin.Gather))
-//}
-//
-//func TestMethod(t *testing.T) {
-//	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.RequestBody) {
-//		if r.Method == "POST" {
-//			w.WriteHeader(http.StatusOK)
-//		} else {
-//			w.WriteHeader(http.StatusNotFound)
-//		}
-//	}))
-//	defer fakeServer.Close()
-//
-//	plugin := &plugin.HTTP{
-//		URLs:   []string{fakeServer.URL},
-//		Method: "POST",
-//	}
-//
-//	p, _ := parsers.NewParser(&parsers.Config{
-//		DataFormat: "json",
-//		MetricName: "metricName",
-//	})
-//	plugin.SetParser(p)
-//
-//	var acc testutil.Accumulator
-//	plugin.Init()
-//	require.NoError(t, acc.GatherError(plugin.Gather))
-//}
-//
-//const simpleJSON = `
-//{
-//    "a": 1.2
-//}
-//`
-//
-//func TestBodyAndContentEncoding(t *testing.T) {
-//	ts := httptest.NewServer(http.NotFoundHandler())
-//	defer ts.Close()
-//
-//	url := fmt.Sprintf("http://%s", ts.Listener.Addr().String())
-//
-//	tests := []struct {
-//		name             string
-//		plugin           *plugin.HTTP
-//		queryHandlerFunc func(t *testing.T, w http.ResponseWriter, r *http.RequestBody)
-//	}{
-//		{
-//			name: "no body",
-//			plugin: &plugin.HTTP{
-//				Method: "POST",
-//				URLs:   []string{url},
-//			},
-//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.RequestBody) {
-//				body, err := ioutil.ReadAll(r.Body)
-//				require.NoError(t, err)
-//				require.Equal(t, []byte(""), body)
-//				w.WriteHeader(http.StatusOK)
-//			},
-//		},
-//		{
-//			name: "post body",
-//			plugin: &plugin.HTTP{
-//				URLs:   []string{url},
-//				Method: "POST",
-//				Body:   "test",
-//			},
-//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.RequestBody) {
-//				body, err := ioutil.ReadAll(r.Body)
-//				require.NoError(t, err)
-//				require.Equal(t, []byte("test"), body)
-//				w.WriteHeader(http.StatusOK)
-//			},
-//		},
-//		{
-//			name: "get method body is sent",
-//			plugin: &plugin.HTTP{
-//				URLs:   []string{url},
-//				Method: "GET",
-//				Body:   "test",
-//			},
-//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.RequestBody) {
-//				body, err := ioutil.ReadAll(r.Body)
-//				require.NoError(t, err)
-//				require.Equal(t, []byte("test"), body)
-//				w.WriteHeader(http.StatusOK)
-//			},
-//		},
-//		{
-//			name: "gzip encoding",
-//			plugin: &plugin.HTTP{
-//				URLs:            []string{url},
-//				Method:          "GET",
-//				Body:            "test",
-//				ContentEncoding: "gzip",
-//			},
-//			queryHandlerFunc: func(t *testing.T, w http.ResponseWriter, r *http.RequestBody) {
-//				require.Equal(t, r.Header.Get("Content-Encoding"), "gzip")
-//
-//				gr, err := gzip.NewReader(r.Body)
-//				require.NoError(t, err)
-//				body, err := ioutil.ReadAll(gr)
-//				require.NoError(t, err)
-//				require.Equal(t, []byte("test"), body)
-//				w.WriteHeader(http.StatusOK)
-//			},
-//		},
-//	}
-//	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//			ts.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.RequestBody) {
-//				tt.queryHandlerFunc(t, w, r)
-//			})
-//
-//			parser, err := parsers.NewParser(&parsers.Config{DataFormat: "influx"})
-//			require.NoError(t, err)
-//
-//			tt.plugin.SetParser(parser)
-//
-//			var acc testutil.Accumulator
-//			tt.plugin.Init()
-//			err = tt.plugin.Gather(&acc)
-//			require.NoError(t, err)
-//		})
-//	}
 //}

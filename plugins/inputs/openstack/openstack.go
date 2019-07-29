@@ -261,7 +261,7 @@ func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
 				"local_disk_usage":    hypervisor.LocalGbUsed,
 			}
 			acc.AddFields("openstack_compute", fields, tagMap{
-				"name":   hypervisor.HypervisorHostname,
+				"hostname":   hypervisor.HypervisorHostname,
 				"region": o.Region,
 			})
 		}
@@ -306,11 +306,16 @@ func (o *OpenStack) accumulateComputeProjectQuotas(acc telegraf.Accumulator) {
 //
 // accumulateIdentity accumulates statistics from the identity service.
 func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
+	acc.AddFields("openstack_identity", fieldMap{"api_state": 1,}, tagMap{
+		"region": o.Region,
+	})
+
 	fields := fieldMap{
 		"num_projects": len(o.projects),
 		"num_servives": len(o.services),
 		"num_users":    len(o.users),
 		"num_group":    len(o.groups),
+
 	}
 	acc.AddFields("openstack_identity", fields, tagMap{
 		"region":  o.Region,
@@ -513,7 +518,7 @@ func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) {
 	} else {
 		for _, storagePool := range storagePools {
 			tags := tagMap{
-				"backed_state": storagePool.Capabilities.BackendState,
+				"backend_state": storagePool.Capabilities.BackendState,
 				"backend_name": storagePool.Capabilities.VolumeBackendName,
 				"region":       o.Region,
 			}
@@ -521,8 +526,8 @@ func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) {
 			fields := fieldMap{
 				"total_capacity_gb":           storagePool.Capabilities.TotalCapacityGb,
 				"free_capacity_gb":            storagePool.Capabilities.FreeCapacityGb,
-				"allocated_capacity_gb":       storagePool.Capabilities.AllocatedCapacityGb,
-				"provisioned_capacity_gb":     storagePool.Capabilities.ProvisionedCapacityGb,
+				"allocated_capacity_gb":       float64(storagePool.Capabilities.AllocatedCapacityGb),
+				"provisioned_capacity_gb":     float64(storagePool.Capabilities.ProvisionedCapacityGb),
 				"max_over_subscription_ratio": overcommit,
 			}
 			acc.AddFields("openstack_storage_pool", fields, tags)
@@ -548,7 +553,7 @@ func (o *OpenStack) accumulateVolumeProjectQuotas(acc telegraf.Accumulator) {
 			if (blockstorageQuotas.Snapshots.Limit == -1) {
 				blockstorageQuotas.Snapshots.Limit = 99999
 			}
-			acc.AddFields("openstack_storage", fieldMap{
+			acc.AddFields("openstack_volumes", fieldMap{
 				"volumes_limit":              blockstorageQuotas.Volumes.Limit,
 				"volumes_allocated":          blockstorageQuotas.Volumes.Allocated,
 				"volumes_inUse":              blockstorageQuotas.Volumes.InUse,

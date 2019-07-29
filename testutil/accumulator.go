@@ -333,8 +333,11 @@ func (a *Accumulator) AssertContainsTaggedFields(
 			continue
 		}
 
-		if p.Measurement == measurement && reflect.DeepEqual(fields, p.Fields) {
-			return
+		if p.Measurement == measurement {
+			if reflect.DeepEqual(fields, p.Fields){
+				return
+			}
+
 		}
 	}
 	msg := fmt.Sprintf("unknown measurement %s with tags %v", measurement, tags)
