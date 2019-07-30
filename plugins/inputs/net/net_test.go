@@ -17,7 +17,7 @@ func TestNetStats(t *testing.T) {
 	var acc testutil.Accumulator
 
 	netio := net.IOCountersStat{
-		Name:        "ens3",
+		Name:        "eth0",
 		BytesSent:   1123,
 		BytesRecv:   8734422,
 		PacketsSent: 781,
@@ -62,7 +62,7 @@ func TestNetStats(t *testing.T) {
 	require.NoError(t, err)
 
 	ntags := map[string]string{
-		"interface": "ens3",
+		"interface": "eth0",
 	}
 
 	fields1 := map[string]interface{}{

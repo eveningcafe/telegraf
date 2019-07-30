@@ -9,7 +9,6 @@ import (
 	"github.com/influxdata/telegraf/filter"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	"github.com/influxdata/telegraf/plugins/inputs/system"
-	"github.com/vishvananda/netlink"
 )
 
 type NetIOStats struct {
@@ -64,7 +63,6 @@ func (s *NetIOStats) Gather(acc telegraf.Accumulator) error {
 		interfacesByName[iface.Name] = iface
 	}
 
-	var link netlink.Link
 	for _, io := range netio {
 		if len(s.Interfaces) != 0 {
 			var found bool
@@ -95,8 +93,6 @@ func (s *NetIOStats) Gather(acc telegraf.Accumulator) error {
 			"interface": io.Name,
 		}
 
-		link, _ = netlink.LinkByName("io.Name")
-
 		fields := map[string]interface{}{
 			"bytes_sent":   io.BytesSent,
 			"bytes_recv":   io.BytesRecv,
@@ -106,7 +102,6 @@ func (s *NetIOStats) Gather(acc telegraf.Accumulator) error {
 			"err_out":      io.Errout,
 			"drop_in":      io.Dropin,
 			"drop_out":     io.Dropout,
-			"operation":    (*link.Attrs()).OperState.String(),
 		}
 		acc.AddCounter("net", fields, tags)
 	}

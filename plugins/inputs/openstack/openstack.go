@@ -38,8 +38,8 @@ const (
 
 var sampleConfig = `
   ## This is the recommended interval to poll.
-  interval = '60m'
-  ## Region of openstack cluster which pluin crawl
+  interval = '20m'
+  ## Region of openstack cluster which crawled by plugin
   region = "RegionOne"
   ## The identity endpoint to authenticate against openstack service, use v3 indentity api
   identity_endpoint = "https://my.openstack.cloud:5000"
@@ -55,15 +55,15 @@ var sampleConfig = `
   password = "Passw0rd"
   ## Opesntack service type collector
   services_gather = [
-    "identity"
-    "volumev3"
-    "network"
-    "compute"
+    "identity",
+    "volumev3",
+    "network",
+    "compute",
   ]
   ## Optional TLS Config
-  # tls_ca = "/etc/telegraf/openstack.crt"
+  tls_ca = "/etc/telegraf/openstack.crt"
   ## Use TLS but skip chain & host verification
-  # insecure_skip_verify = false
+  insecure_skip_verify = false
 `
 
 type tagMap map[string]string
@@ -236,7 +236,7 @@ func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
 			acc.AddFields("openstack_compute", fields, tagMap{
 				"region":   o.Region,
 				"service":  agent.Binary,
-				"hostname": agent.Host,
+				"agent_host": agent.Host,
 				"status":   agent.Status,
 				"zone":     agent.Zone,
 			})
@@ -261,7 +261,7 @@ func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
 				"local_disk_usage":    hypervisor.LocalGbUsed,
 			}
 			acc.AddFields("openstack_compute", fields, tagMap{
-				"hostname":   hypervisor.HypervisorHostname,
+				"hypervisor_host":   hypervisor.HypervisorHostname,
 				"region": o.Region,
 			})
 		}
@@ -350,7 +350,7 @@ func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
 			acc.AddFields("openstack_network", fields, tagMap{
 				"region":   o.Region,
 				"service":  agent.Binary,
-				"hostname": agent.Host,
+				"agent_host": agent.Host,
 				"status":   status,
 				"zone":     agent.AvailabilityZone,
 			})
@@ -502,7 +502,7 @@ func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 			acc.AddFields("openstack_volumes", fields, tagMap{
 				"region":   o.Region,
 				"service":  agent.Binary,
-				"hostname": agent.Host,
+				"agent_host": agent.Host,
 				"status":   agent.Status,
 				"zone":     agent.Zone,
 			})
