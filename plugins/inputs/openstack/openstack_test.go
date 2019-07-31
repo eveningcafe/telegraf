@@ -1,7 +1,6 @@
 package openstack_test
 
 import (
-	"fmt"
 	"github.com/influxdata/telegraf/internal/tls"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/blockstorage"
@@ -237,7 +236,7 @@ func TestOpenStackCluster(t *testing.T) {
 		"local_disk_avalable": 410,
 	}
 	cTags := map[string]string{
-		"hostname": "compute01",
+		"hypervisor_host": "compute01",
 		"region" : "RegionOne",
 	}
 	acc.AssertContainsTaggedFields(t, "openstack_compute", cFields, cTags)
@@ -291,23 +290,23 @@ func TestOpenStackCluster(t *testing.T) {
 
 }
 
-func TestOpenstackInReal(t *testing.T) {
-
-	plugin := &plugin.OpenStack{
-		IdentityEndpoint: "https://controller:5000/v3",
-		Project:          "admin",
-		UserDomainID:     "default",
-		ProjectDomainID:  "default",
-		Password:         "Welcome123",
-		Username:         "admin",
-		Region:           "RegionOne",
-		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
-		ClientConfig: tls.ClientConfig{
-			InsecureSkipVerify: true,
-			TLSCA:              "test/resources/openstack.crt"},
-	}
-	var acc testutil.Accumulator
-	require.NoError(t, acc.GatherError(plugin.Gather))
-	fmt.Printf("hello")
-
-}
+//func TestOpenstackInReal(t *testing.T) {
+//
+//	plugin := &plugin.OpenStack{
+//		IdentityEndpoint: "https://controller:5000/v3",
+//		Project:          "admin",
+//		UserDomainID:     "default",
+//		ProjectDomainID:  "default",
+//		Password:         "Welcome123",
+//		Username:         "admin",
+//		Region:           "RegionOne",
+//		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
+//		ClientConfig: tls.ClientConfig{
+//			InsecureSkipVerify: true,
+//			TLSCA:              "test/resources/openstack.crt"},
+//	}
+//	var acc testutil.Accumulator
+//	require.NoError(t, acc.GatherError(plugin.Gather))
+//	fmt.Printf("hello")
+//
+//}

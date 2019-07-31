@@ -6,6 +6,7 @@ import (
 	"github.com/influxdata/telegraf/internal/tls"
 	"log"
 	"strconv"
+	"sync"
 
 	//"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/schedulerstats"
 	"github.com/influxdata/telegraf"
@@ -74,6 +75,7 @@ type serviceMap map[string]services.Service
 type projectMap map[string]projects.Project
 type userMap map[string]users.User
 type groupMap map[string]groups.Group
+type networkMap map[string]networkingNET.Network
 
 // OpenStack is the main structure associated with a collection instance.
 type OpenStack struct {
@@ -102,6 +104,8 @@ type OpenStack struct {
 	users    userMap
 	groups   groupMap
 	projects projectMap
+	networks networkMap
+	accumulators []func(telegraf.Accumulator) error
 
 	// use True only in test
 	skipInitialize bool
@@ -120,7 +124,7 @@ func (o *OpenStack) Description() string {
 }
 
 // initialize performs any necessary initialization functions
-func (o *OpenStack) initialize( ) error {
+func (o *OpenStack) initialize() error {
 	tlsCfg, err := o.ClientConfig.TLSConfig()
 	// Authenticate against Keystone and get a token provider
 	provider, err := authenticator.AuthenticatedClient(authenticator.AuthOption{
@@ -163,6 +167,7 @@ func (o *OpenStack) initialize( ) error {
 	o.projects = projectMap{}
 	o.users = userMap{}
 	o.groups = groupMap{}
+	o.networks = networkMap{}
 
 	return err
 }
@@ -201,6 +206,17 @@ func (o *OpenStack) gatherUsers() error {
 
 	return err
 }
+func (o *OpenStack) gatherNetworks() error {
+	networks, err := networkingNET.List(o.networkClient)
+	if err != nil {
+		return fmt.Errorf("unable to get netowork info: %v", err)
+	}
+	for _, network := range networks {
+		o.networks[network.ID] = network
+	}
+
+	return err
+}
 
 func (o *OpenStack) gatherGroups() error {
 	groups, err := groups.List(o.identityClient)
@@ -215,7 +231,7 @@ func (o *OpenStack) gatherGroups() error {
 }
 
 //
-func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) error{
 	agents, err := computeServices.List(o.computeClient)
 	if err != nil {
 		acc.AddFields("openstack_compute", fieldMap{"api_state": 0,}, tagMap{
@@ -234,18 +250,19 @@ func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) {
 				fields["agent_state"] = 0
 			}
 			acc.AddFields("openstack_compute", fields, tagMap{
-				"region":   o.Region,
-				"service":  agent.Binary,
+				"region":     o.Region,
+				"service":    agent.Binary,
 				"agent_host": agent.Host,
-				"status":   agent.Status,
-				"zone":     agent.Zone,
+				"status":     agent.Status,
+				"zone":       agent.Zone,
 			})
 		}
 	}
+	return err
 }
 
 // accumulateHypervisors accumulates statistics from hypervisors.
-func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) error{
 	hypervisors, err := computeHypervisors.List(o.computeClient)
 	if err != nil {
 
@@ -261,15 +278,17 @@ func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) {
 				"local_disk_usage":    hypervisor.LocalGbUsed,
 			}
 			acc.AddFields("openstack_compute", fields, tagMap{
-				"hypervisor_host":   hypervisor.HypervisorHostname,
-				"region": o.Region,
+				"hypervisor_host": hypervisor.HypervisorHostname,
+				"region":          o.Region,
 			})
 		}
 	}
+	return err
 }
 
 //
-func (o *OpenStack) accumulateComputeProjectQuotas(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateComputeProjectQuotas(acc telegraf.Accumulator) error {
+	var err error
 	for _, p := range o.projects {
 		if p.Name == "service" {
 			continue
@@ -301,11 +320,12 @@ func (o *OpenStack) accumulateComputeProjectQuotas(acc telegraf.Accumulator) {
 			})
 		}
 	}
+	return err
 }
 
 //
 // accumulateIdentity accumulates statistics from the identity service.
-func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) error {
 	acc.AddFields("openstack_identity", fieldMap{"api_state": 1,}, tagMap{
 		"region": o.Region,
 	})
@@ -315,15 +335,15 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) {
 		"num_servives": len(o.services),
 		"num_users":    len(o.users),
 		"num_group":    len(o.groups),
-
 	}
 	acc.AddFields("openstack_identity", fields, tagMap{
-		"region":  o.Region,
+		"region": o.Region,
 	})
+	return nil
 }
 
 //
-func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) error{
 	agents, err := networkingAgent.List(o.networkClient)
 	if err != nil {
 		acc.AddFields("openstack_network", fieldMap{"api_state": 0,}, tagMap{
@@ -348,18 +368,19 @@ func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) {
 			}
 
 			acc.AddFields("openstack_network", fields, tagMap{
-				"region":   o.Region,
-				"service":  agent.Binary,
+				"region":     o.Region,
+				"service":    agent.Binary,
 				"agent_host": agent.Host,
-				"status":   status,
-				"zone":     agent.AvailabilityZone,
+				"status":     status,
+				"zone":       agent.AvailabilityZone,
 			})
 		}
 	}
+	return err
 }
 
 //
-func (o *OpenStack) accumulateNetworkFloatingIP(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateNetworkFloatingIP(acc telegraf.Accumulator) error {
 	floatingIps, err := networkingFloatingIP.List(o.networkClient)
 	if err != nil {
 		// bypass cause openstack use provider network model
@@ -376,31 +397,29 @@ func (o *OpenStack) accumulateNetworkFloatingIP(acc telegraf.Accumulator) {
 			"region": o.Region,
 		})
 	}
+	return err
 }
 
 // num_net and subnet, need tag network provider or not
-func (o *OpenStack) accumulateNetworkNET(acc telegraf.Accumulator) {
-	networks, err := networkingNET.List(o.networkClient)
-	if err != nil {
-		//
-	} else {
+func (o *OpenStack) accumulateNetworkNET(acc telegraf.Accumulator) error {
+	for _, network := range o.networks {
 		acc.AddFields("openstack_network", fieldMap{
-			"num_network": len(networks),
+			"num_subnet_in_network": len(network.Subnets),
 		}, tagMap{
-			"region": o.Region,
+			"region":  o.Region,
+			"network": network.Name,
 		})
 	}
-	for _, network := range networks {
-		acc.AddFields("openstack_network", fieldMap{
-			"num_subnet": len(network.Subnets),
-		}, tagMap{
-			"region": o.Region,
-		})
-	}
+	acc.AddFields("openstack_network", fieldMap{
+		"num_network": len(o.networks),
+	}, tagMap{
+		"region": o.Region,
+	})
+	return nil
 }
 
 //
-func (o *OpenStack) accumulateNetworkIp(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateNetworkIp(acc telegraf.Accumulator) error{
 	ipAvail, err := networkingNET.NetworkIPAvailabilities(o.networkClient)
 	if err != nil {
 		//
@@ -410,6 +429,7 @@ func (o *OpenStack) accumulateNetworkIp(acc telegraf.Accumulator) {
 			if p, ok := o.projects[ipAvailNet.TenantID]; ok {
 				project = p.Name
 			}
+			// for each in loop of subnet
 			for _, ipAvalSubnet := range ipAvailNet.SubnetIPAvailability {
 				tags := tagMap{
 					"region":      o.Region,
@@ -422,7 +442,7 @@ func (o *OpenStack) accumulateNetworkIp(acc telegraf.Accumulator) {
 					"ip_used":  ipAvailNet.UsedIps,
 				}, tags)
 			}
-
+			// overall outsite
 			acc.AddFields("openstack_network", fieldMap{
 				"ip_used":  ipAvailNet.UsedIps,
 				"ip_total": ipAvailNet.TotalIps,
@@ -435,11 +455,12 @@ func (o *OpenStack) accumulateNetworkIp(acc telegraf.Accumulator) {
 
 		}
 	}
+	return err
 }
 
 //
-func (o *OpenStack) accumulateNetworkProjectQuotas(acc telegraf.Accumulator) {
-
+func (o *OpenStack) accumulateNetworkProjectQuotas(acc telegraf.Accumulator) error {
+	var err error
 	for _, p := range o.projects {
 		if p.Name == "service" {
 			continue
@@ -478,10 +499,11 @@ func (o *OpenStack) accumulateNetworkProjectQuotas(acc telegraf.Accumulator) {
 			})
 		}
 	}
+	return err
 }
 
 //
-func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) error {
 	agents, err := blockstorageServices.List(o.volumeClient)
 	if err != nil {
 		acc.AddFields("openstack_volumes", fieldMap{"api_state": 0,}, tagMap{
@@ -500,18 +522,19 @@ func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) {
 				fields["agent_state"] = 0
 			}
 			acc.AddFields("openstack_volumes", fields, tagMap{
-				"region":   o.Region,
-				"service":  agent.Binary,
+				"region":     o.Region,
+				"service":    agent.Binary,
 				"agent_host": agent.Host,
-				"status":   agent.Status,
-				"zone":     agent.Zone,
+				"status":     agent.Status,
+				"zone":       agent.Zone,
 			})
 		}
 	}
+	return err
 }
 
 // accumulateStoragePools accumulates statistics about storage pools.
-func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) error {
 	storagePools, err := blockstorageScheduler.ListPool(o.volumeClient)
 	if err != nil {
 
@@ -519,8 +542,8 @@ func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) {
 		for _, storagePool := range storagePools {
 			tags := tagMap{
 				"backend_state": storagePool.Capabilities.BackendState,
-				"backend_name": storagePool.Capabilities.VolumeBackendName,
-				"region":       o.Region,
+				"backend_name":  storagePool.Capabilities.VolumeBackendName,
+				"region":        o.Region,
 			}
 			overcommit, _ := strconv.ParseFloat(storagePool.Capabilities.MaxOverSubscriptionRatio, 64)
 			fields := fieldMap{
@@ -533,10 +556,12 @@ func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) {
 			acc.AddFields("openstack_storage_pool", fields, tags)
 		}
 	}
+	return err
 }
 
 //
-func (o *OpenStack) accumulateVolumeProjectQuotas(acc telegraf.Accumulator) {
+func (o *OpenStack) accumulateVolumeProjectQuotas(acc telegraf.Accumulator) error {
+	var err error
 	for _, p := range o.projects {
 		if p.Name == "service" {
 			continue
@@ -554,21 +579,22 @@ func (o *OpenStack) accumulateVolumeProjectQuotas(acc telegraf.Accumulator) {
 				blockstorageQuotas.Snapshots.Limit = 99999
 			}
 			acc.AddFields("openstack_volumes", fieldMap{
-				"volumes_limit":              blockstorageQuotas.Volumes.Limit,
-				"volumes_allocated":          blockstorageQuotas.Volumes.Allocated,
-				"volumes_inUse":              blockstorageQuotas.Volumes.InUse,
-				"volumes_limit_gb":           blockstorageQuotas.Gigabytes.Limit,
-				"volumes_inUse_gb":           blockstorageQuotas.Gigabytes.InUse,
-				"volummes_allocated_gb":      blockstorageQuotas.Gigabytes.Allocated,
-				"snapshot_limit":     blockstorageQuotas.Snapshots.Limit,
-				"snapshot_inUse":     blockstorageQuotas.Snapshots.InUse,
-				"snapshot_allocated": blockstorageQuotas.Snapshots.Allocated,
+				"volumes_limit":         blockstorageQuotas.Volumes.Limit,
+				"volumes_allocated":     blockstorageQuotas.Volumes.Allocated,
+				"volumes_inUse":         blockstorageQuotas.Volumes.InUse,
+				"volumes_limit_gb":      blockstorageQuotas.Gigabytes.Limit,
+				"volumes_inUse_gb":      blockstorageQuotas.Gigabytes.InUse,
+				"volummes_allocated_gb": blockstorageQuotas.Gigabytes.Allocated,
+				"snapshot_limit":        blockstorageQuotas.Snapshots.Limit,
+				"snapshot_inUse":        blockstorageQuotas.Snapshots.InUse,
+				"snapshot_allocated":    blockstorageQuotas.Snapshots.Allocated,
 			}, tagMap{
 				"region":  o.Region,
 				"project": p.Name,
 			})
 		}
 	}
+	return err
 }
 
 // gather is a wrapper around library calls out to gophercloud that catches
@@ -600,6 +626,7 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 		"projects": o.gatherProjects,
 		"users":    o.gatherUsers,
 		"group":    o.gatherGroups,
+		"network":  o.gatherNetworks,
 	}
 
 	for resources, gatherer := range gatherers {
@@ -609,25 +636,26 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	}
 	// Accumulate statistics . depend on which service will cralw
 
-	accumulators := []func(telegraf.Accumulator){}
+	o.accumulators = []func(telegraf.Accumulator) error{}
 
 	if o.filter.Match("identity") {
-		accumulators = append(accumulators, o.accumulateIdentity)
+		o.accumulators = append(o.accumulators, o.accumulateIdentity)
 	}
+
 	if o.filter.Match("compute") {
-		accumulators = append(accumulators,
+		o.accumulators = append(o.accumulators,
 			o.accumulateComputeAgents,
 			o.accumulateComputeHypervisors,
 			o.accumulateComputeProjectQuotas)
 	}
 	if o.filter.Match("volumev3") {
-		accumulators = append(accumulators,
+		o.accumulators = append(o.accumulators,
 			o.accumulateVolumeAgents,
 			o.accumulateVolumeStoragePools,
 			o.accumulateVolumeProjectQuotas)
 	}
 	if o.filter.Match("network") {
-		accumulators = append(accumulators,
+		o.accumulators = append(o.accumulators,
 			o.accumulateNetworkAgents,
 			o.accumulateNetworkFloatingIP,
 			o.accumulateNetworkNET,
@@ -635,10 +663,17 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 			o.accumulateNetworkProjectQuotas)
 	}
 
-	for _, accumulator := range accumulators {
+	var wg sync.WaitGroup
+	for _, accumulator := range o.accumulators {
+		//accumulator(acc)
+		wg.Add(1)
 		//go routine in here
-		accumulator(acc)
+		go func(o *OpenStack) {
+			defer wg.Done()
+			acc.AddError(accumulator(acc))
+		}(o)
 	}
+	wg.Wait()
 	return nil
 }
 
