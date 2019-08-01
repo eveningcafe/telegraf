@@ -1,0 +1,78 @@
+var db = 'telegraf'
+
+var rp = 'autogen'
+
+var measurement = 'vcsnet'
+
+var groupBy = ['host', 'interface']
+
+var whereFilter = lambda: TRUE
+
+var name = 'Network Bandwidth RX'
+
+var idVar = name + '-{{.Group}}'
+
+var message = 'Network Bandwidth RX Util of interface {{ index .Tags "interface" }} on host {{ index .Tags "host" }} is  {{ index .Fields "net_bandwidth_rx" | printf "%0.2f" }} %'
+
+var idTag = 'alertID'
+
+var levelTag = 'level'
+
+var messageField = 'message'
+
+var durationField = 'duration'
+
+var outputDB = 'chronograf'
+
+var outputRP = 'autogen'
+
+var outputMeasurement = 'alerts'
+
+var triggerType = 'threshold'
+
+var warn = 70
+
+var crit = 90
+
+var data = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |derivative('bytes_recv')
+		.unit(1s)
+		.nonNegative()
+        .as('value') 
+	|eval(lambda: float("value") / float("speedBytes") * 100.0)
+		.as('net_bandwidth_rx')
+
+var trigger = data
+    |alert()
+        .crit(lambda: "net_bandwidth_rx" > crit)
+        .warn(lambda: "net_bandwidth_rx" > warn)
+        .stateChangesOnly()
+        .message(message)
+        .id(idVar)
+        .idTag(idTag)
+        .levelTag(levelTag)
+        .messageField(messageField)
+        .durationField(durationField)
+        .stateChangesOnly()
+        .log('/tmp/alerts.log')
+
+trigger
+    |eval(lambda: float("net_bandwidth_rx"))
+        .as('value')
+        .keep()
+    |influxDBOut()
+        .create()
+        .database(outputDB)
+        .retentionPolicy(outputRP)
+        .measurement(outputMeasurement)
+        .tag('alertName', name)
+        .tag('triggerType', triggerType)
+
+trigger
+    |httpOut('output')

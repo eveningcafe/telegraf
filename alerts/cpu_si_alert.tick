@@ -1,0 +1,77 @@
+var db = 'telegraf'
+
+var rp = 'autogen'
+
+var measurement = 'cpu'
+
+var groupBy = ['host', 'cpu']
+
+var whereFilter = lambda: TRUE
+
+var name = 'CPU SOFTIRQ'
+
+var idVar = name + '-{{.Group}}'
+
+var message = 'CPU SOFTIRQ of CPU {{ index .Tags "cpu" }}  on host {{ index .Tags "host" }}  is {{ index .Fields "cpu_softirq_value" | printf "%0.2f" }} %'
+
+var idTag = 'alertID'
+
+var levelTag = 'level'
+
+var messageField = 'message'
+
+var durationField = 'duration'
+
+var outputDB = 'chronograf'
+
+var outputRP = 'autogen'
+
+var outputMeasurement = 'alerts'
+
+var triggerType = 'threshold'
+
+var info = 50
+
+var warn = 70
+
+var crit = 90
+
+var data = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |eval(lambda: float("usage_softirq"))
+        .as('cpu_softirq_value')
+
+var trigger = data
+    |alert()
+        .info(lambda: "cpu_softirq_value" > info)
+        .crit(lambda: "cpu_softirq_value" > crit)
+        .warn(lambda: "cpu_softirq_value" > warn)
+        .stateChangesOnly()
+        .message(message)
+        .id(idVar)
+        .idTag(idTag)
+        .levelTag(levelTag)
+        .messageField(messageField)
+        .durationField(durationField)
+        .stateChangesOnly()
+        .log('/tmp/alerts.log')
+
+trigger
+    |eval(lambda: float("cpu_softirq_value"))
+        .as('value')
+        .keep()
+    |influxDBOut()
+        .create()
+        .database(outputDB)
+        .retentionPolicy(outputRP)
+        .measurement(outputMeasurement)
+        .tag('alertName', name)
+        .tag('triggerType', triggerType)
+
+trigger
+    |httpOut('output')

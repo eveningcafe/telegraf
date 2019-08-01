@@ -18,29 +18,29 @@ type Hypervisor struct {
 			Sockets int `json:"sockets"`
 		} `json:"topology"`
 	} `json:"cpu_info"`
-	CurrentWorkload    int    `json:"current_workload"`
+	CurrentWorkload    float64    `json:"current_workload"`
 	Status             string `json:"status"`
 	State              string `json:"state"`
-	DiskAvailableLeast int    `json:"disk_available_least"`
+	DiskAvailableLeast float64    `json:"disk_available_least"`
 	HostIP             string `json:"host_ip"`
-	FreeDiskGb         int    `json:"free_disk_gb"`
-	FreeRAMMb          int    `json:"free_ram_mb"`
+	FreeDiskGb         float64    `json:"free_disk_gb"`
+	FreeRAMMb          float64    `json:"free_ram_mb"`
 	HypervisorHostname string `json:"hypervisor_hostname"`
 	HypervisorType     string `json:"hypervisor_type"`
-	HypervisorVersion  int    `json:"hypervisor_version"`
+	HypervisorVersion  float64    `json:"hypervisor_version"`
 	ID                 string `json:"id"`
-	LocalGb            int    `json:"local_gb"`
-	LocalGbUsed        int    `json:"local_gb_used"`
-	MemoryMb           int    `json:"memory_mb"`
-	MemoryMbUsed       int    `json:"memory_mb_used"`
+	LocalGb            float64    `json:"local_gb"`
+	LocalGbUsed        float64    `json:"local_gb_used"`
+	MemoryMb           float64    `json:"memory_mb"`
+	MemoryMbUsed       float64    `json:"memory_mb_used"`
 	RunningVms         int    `json:"running_vms"`
 	Service            struct {
 		Host           string      `json:"host"`
 		ID             string      `json:"id"`
 		DisabledReason interface{} `json:"disabled_reason"`
 	} `json:"service"`
-	Vcpus     int `json:"vcpus"`
-	VcpusUsed int `json:"vcpus_used"`
+	Vcpus     float64 `json:"vcpus"`
+	VcpusUsed float64 `json:"vcpus_used"`
 }
 
 func List(client *v2.ComputeClient) ([]Hypervisor, error) {

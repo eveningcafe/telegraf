@@ -1,0 +1,81 @@
+var db = 'telegraf'
+
+var rp = 'autogen'
+
+var measurement = 'diskio'
+
+var groupBy = ['host', 'name']
+
+var whereFilter = lambda: TRUE
+
+var name = 'Disk Util'
+
+var idVar = name + '-{{.Group}}'
+
+var message = 'Disk Util of {{ index .Tags "name" }} on host {{ index .Tags "host" }} is  {{ index .Fields "disk_util_value" | printf "%0.2f" }} %'
+
+var idTag = 'alertID'
+
+var levelTag = 'level'
+
+var messageField = 'message'
+
+var durationField = 'duration'
+
+var outputDB = 'chronograf'
+
+var outputRP = 'autogen'
+
+var outputMeasurement = 'alerts'
+
+var triggerType = 'threshold'
+
+var info = 50
+
+var warn = 70
+
+var crit = 90
+
+var data = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |derivative('io_time')
+		.unit(1ms)
+		.nonNegative()
+        .as('value') 
+	|eval(lambda: "value" * 100)
+		.as('disk_util_value')
+
+var trigger = data
+    |alert()
+		.info(lambda: "disk_util_value" > info)
+        .crit(lambda: "disk_util_value" > crit)
+        .warn(lambda: "disk_util_value" > warn)
+        .stateChangesOnly()
+        .message(message)
+        .id(idVar)
+        .idTag(idTag)
+        .levelTag(levelTag)
+        .messageField(messageField)
+        .durationField(durationField)
+        .stateChangesOnly()
+        .log('/tmp/alerts.log')
+
+trigger
+    |eval(lambda: float("disk_util_value"))
+        .as('value')
+        .keep()
+    |influxDBOut()
+        .create()
+        .database(outputDB)
+        .retentionPolicy(outputRP)
+        .measurement(outputMeasurement)
+        .tag('alertName', name)
+        .tag('triggerType', triggerType)
+
+trigger
+    |httpOut('output')

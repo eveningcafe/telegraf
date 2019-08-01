@@ -502,7 +502,8 @@ password = "sammy_admin"
 # Collects performance metrics from OpenStack services
 [[inputs.openstack]]
   ## This is the recommended interval to poll.
-  #interval = '60m'
+  interval = "30s"
+  ##interval = '20s'
   ## Region of openstack cluster which pluin crawl
   region = "RegionOne"
   ## The identity endpoint to authenticate against openstack service, use v3 indentity api

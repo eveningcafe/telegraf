@@ -1,0 +1,74 @@
+var db = 'telegraf'
+
+var rp = 'autogen'
+
+var measurement = 'mem'
+
+var groupBy = ['host']
+
+var whereFilter = lambda: TRUE
+
+var name = 'Mem Used'
+
+var idVar = name + '-{{.Group}}'
+
+var message = 'Mem Used on host {{ index .Tags "host" }} is  {{ index .Fields "mem_used_value" | printf "%0.2f" }} %'
+
+var idTag = 'alertID'
+
+var levelTag = 'level'
+
+var messageField = 'message'
+
+var durationField = 'duration'
+
+var outputDB = 'chronograf'
+
+var outputRP = 'autogen'
+
+var outputMeasurement = 'alerts'
+
+var triggerType = 'threshold'
+
+var warn = 70
+
+var crit = 90
+
+var data = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |eval(lambda: float("used_percent"))
+        .as('mem_used_value')
+
+var trigger = data
+    |alert()
+        .crit(lambda: "mem_used_value" > crit)
+        .warn(lambda: "mem_used_value" > warn)
+        .stateChangesOnly()
+        .message(message)
+        .id(idVar)
+        .idTag(idTag)
+        .levelTag(levelTag)
+        .messageField(messageField)
+        .durationField(durationField)
+        .stateChangesOnly()
+        .log('/tmp/alerts.log')
+
+trigger
+    |eval(lambda: float("mem_used_value"))
+        .as('value')
+        .keep()
+    |influxDBOut()
+        .create()
+        .database(outputDB)
+        .retentionPolicy(outputRP)
+        .measurement(outputMeasurement)
+        .tag('alertName', name)
+        .tag('triggerType', triggerType)
+
+trigger
+    |httpOut('output')

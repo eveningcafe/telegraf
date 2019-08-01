@@ -7,6 +7,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/api/identity/v3/authenticator"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 type Client struct {
@@ -37,6 +38,7 @@ func NewClient(providerClient authenticator.ProviderClient, region string, servi
 		Transport: &http.Transport{
 			TLSClientConfig: providerClient.TlsCfg,
 		},
+		Timeout: time.Second * 5,
 		//Timeout: time.Duration(5), // ondebug comment it
 	}
 

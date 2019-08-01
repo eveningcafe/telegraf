@@ -1,0 +1,74 @@
+var db = 'telegraf'
+
+var rp = 'autogen'
+
+var measurement = 'disk'
+
+var groupBy = ['host', 'path']
+
+var whereFilter = lambda: TRUE
+
+var name = 'Disk Inode'
+
+var idVar = name + '-{{.Group}}'
+
+var message = 'Disk Inode of {{ index .Tags "path" }} on host {{ index .Tags "host" }} is  {{ index .Fields "disk_inode_value" | printf "%0.2f" }} %'
+
+var idTag = 'alertID'
+
+var levelTag = 'level'
+
+var messageField = 'message'
+
+var durationField = 'duration'
+
+var outputDB = 'chronograf'
+
+var outputRP = 'autogen'
+
+var outputMeasurement = 'alerts'
+
+var triggerType = 'threshold'
+
+var warn = 70
+
+var crit = 90
+
+var data = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |eval(lambda: float("inodes_used") / float("inodes_total") * 100.0)
+        .as('disk_inode_value')
+
+var trigger = data
+    |alert()
+        .crit(lambda: "disk_inode_value" > crit)
+        .warn(lambda: "disk_inode_value" > warn)
+        .stateChangesOnly()
+        .message(message)
+        .id(idVar)
+        .idTag(idTag)
+        .levelTag(levelTag)
+        .messageField(messageField)
+        .durationField(durationField)
+        .stateChangesOnly()
+        .log('/tmp/alerts.log')
+
+trigger
+    |eval(lambda: float("disk_inode_value"))
+        .as('value')
+        .keep()
+    |influxDBOut()
+        .create()
+        .database(outputDB)
+        .retentionPolicy(outputRP)
+        .measurement(outputMeasurement)
+        .tag('alertName', name)
+        .tag('triggerType', triggerType)
+
+trigger
+    |httpOut('output')

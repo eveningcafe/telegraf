@@ -1,0 +1,74 @@
+var db = 'telegraf'
+
+var rp = 'autogen'
+
+var measurement = 'system'
+
+var groupBy = ['host']
+
+var whereFilter = lambda: TRUE
+
+var name = 'CPU Load Average'
+
+var idVar = name + '-{{.Group}}'
+
+var message = 'CPU Load average on host {{ index .Tags "host" }}  is {{ index .Fields "cpu_load_util" | printf "%0.2f" }} %'
+
+var idTag = 'alertID'
+
+var levelTag = 'level'
+
+var messageField = 'message'
+
+var durationField = 'duration'
+
+var outputDB = 'chronograf'
+
+var outputRP = 'autogen'
+
+var outputMeasurement = 'alerts'
+
+var triggerType = 'threshold'
+
+var warn = 70
+
+var crit = 90
+
+var data = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |eval(lambda: float("load5") / float("n_cpus") * 100.0)
+        .as('cpu_load_util')
+
+var trigger = data
+    |alert()
+        .crit(lambda: "cpu_load_util" > crit)
+        .warn(lambda: "cpu_load_util" > warn)
+        .stateChangesOnly()
+        .message(message)
+        .id(idVar)
+        .idTag(idTag)
+        .levelTag(levelTag)
+        .messageField(messageField)
+        .durationField(durationField)
+        .stateChangesOnly()
+        .log('/tmp/alerts.log')
+
+trigger
+    |eval(lambda: float("cpu_load_util"))
+        .as('value')
+        .keep()
+    |influxDBOut()
+        .create()
+        .database(outputDB)
+        .retentionPolicy(outputRP)
+        .measurement(outputMeasurement)
+        .tag('alertName', name)
+        .tag('triggerType', triggerType)
+
+trigger
+    |httpOut('output')

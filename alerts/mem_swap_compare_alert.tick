@@ -1,0 +1,98 @@
+var db = 'telegraf'
+
+var rp = 'autogen'
+
+var measurement = 'swap'
+
+var groupBy = ['host']
+
+var whereFilter = lambda: TRUE
+
+var message = 'Mem SWAP Used on host {{ index .Tags "host" }} is  {{ index .Fields "mem_swap_compare" | printf "%0.2f" }} %'
+
+var name = 'Mem SWAP Used'
+
+var idTag = 'alertID'
+
+var idVar = name + '-{{.Group}}'
+
+var levelTag = 'level'
+
+var messageField = 'message'
+
+var durationField = 'duration'
+
+var outputDB = 'chronograf'
+
+var outputRP = 'autogen'
+
+var outputMeasurement = 'alerts'
+
+var triggerType = 'threshold'
+
+var measurement1 = 'mem'
+
+var measurement2 = 'swap'
+
+var window_size = 1m
+
+var warn = 0.7
+
+var crit = 0.9
+
+
+var m1 = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement1)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |eval(lambda: float("available"))
+        .as('value')
+
+var m2 = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement2)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |eval(lambda: float("used"))
+        .as('value')
+
+var data = m1
+    |join(m2)
+        .as('m1', 'm2')
+	|eval(lambda: float ("m2.value") / float ("m1.value"))
+        .as('mem_swap_compare')
+
+
+var trigger = data
+    |alert()
+        .crit(lambda: float ("mem_swap_compare") > crit)
+        .warn(lambda: float ("mem_swap_compare") > warn)
+        .stateChangesOnly()
+        .message(message)
+        .id(idVar)
+        .idTag(idTag)
+        .levelTag(levelTag)
+        .messageField(messageField)
+        .durationField(durationField)
+        .stateChangesOnly()
+        .log('/tmp/alerts.log')
+
+trigger
+    |eval(lambda: float("mem_swap_compare"))
+        .as('value')
+        .keep()
+    |influxDBOut()
+        .create()
+        .database(outputDB)
+        .retentionPolicy(outputRP)
+        .measurement(outputMeasurement)
+        .tag('alertName', name)
+        .tag('triggerType', triggerType)
+
+trigger
+    |httpOut('output')

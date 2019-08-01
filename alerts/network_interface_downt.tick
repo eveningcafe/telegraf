@@ -1,0 +1,71 @@
+var db = 'telegraf'
+
+var rp = 'autogen'
+
+var measurement = 'vcsnet'
+
+var groupBy = ['host', 'interface']
+
+var whereFilter = lambda: TRUE
+
+var name = 'Network Interface Down'
+
+var idVar = name + '-{{.Group}}'
+
+var message = 'Network Interface {{ index .Tags "interface" }} on host {{ index .Tags "host" }} is DOWN'
+
+var idTag = 'alertID'
+
+var levelTag = 'level'
+
+var messageField = 'message'
+
+var durationField = 'duration'
+
+var outputDB = 'chronograf'
+
+var outputRP = 'autogen'
+
+var outputMeasurement = 'alerts'
+
+var triggerType = 'threshold'
+
+var crit = 0
+
+var data = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |eval(lambda: "upValue")
+        .as('value')
+
+var trigger = data
+    |alert()
+        .crit(lambda: "value" == crit)
+        .stateChangesOnly()
+        .message(message)
+        .id(idVar)
+        .idTag(idTag)
+        .levelTag(levelTag)
+        .messageField(messageField)
+        .durationField(durationField)
+        .stateChangesOnly()
+        .log('/tmp/alerts.log')
+
+trigger
+    |eval(lambda: float("value"))
+        .as('value')
+        .keep()
+    |influxDBOut()
+        .create()
+        .database(outputDB)
+        .retentionPolicy(outputRP)
+        .measurement(outputMeasurement)
+        .tag('alertName', name)
+        .tag('triggerType', triggerType)
+
+trigger
+    |httpOut('output')

@@ -1,0 +1,74 @@
+var db = 'telegraf'
+
+var rp = 'autogen'
+
+var measurement = 'conntrack'
+
+var groupBy = ['host', 'path']
+
+var whereFilter = lambda: TRUE
+
+var name = 'Conntrack'
+
+var idVar = name + '-{{.Group}}'
+
+var message = 'Conntrack Util on host {{ index .Tags "host" }} is  {{ index .Fields "net_conntrack_value" | printf "%0.2f" }} %'
+
+var idTag = 'alertID'
+
+var levelTag = 'level'
+
+var messageField = 'message'
+
+var durationField = 'duration'
+
+var outputDB = 'chronograf'
+
+var outputRP = 'autogen'
+
+var outputMeasurement = 'alerts'
+
+var triggerType = 'threshold'
+
+var warn = 70
+
+var crit = 90
+
+var data = stream
+    |from()
+        .database(db)
+        .retentionPolicy(rp)
+        .measurement(measurement)
+        .groupBy(groupBy)
+        .where(whereFilter)
+    |eval(lambda: float("ip_conntrack_count") / float("ip_conntrack_max") * 100.0)
+        .as('net_conntrack_value')
+
+var trigger = data
+    |alert()
+        .crit(lambda: "net_conntrack_value" > crit)
+        .warn(lambda: "net_conntrack_value" > warn)
+        .stateChangesOnly()
+        .message(message)
+        .id(idVar)
+        .idTag(idTag)
+        .levelTag(levelTag)
+        .messageField(messageField)
+        .durationField(durationField)
+        .stateChangesOnly()
+        .log('/tmp/alerts.log')
+
+trigger
+    |eval(lambda: float("net_conntrack_value"))
+        .as('value')
+        .keep()
+    |influxDBOut()
+        .create()
+        .database(outputDB)
+        .retentionPolicy(outputRP)
+        .measurement(outputMeasurement)
+        .tag('alertName', name)
+        .tag('triggerType', triggerType)
+
+trigger
+    |httpOut('output')
