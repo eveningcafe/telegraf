@@ -42,7 +42,7 @@ func TestOpenStackCluster(t *testing.T) {
 	}
 	// fake openstack api
 	fakeKeystoneServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/auth/tokens" {
+		if r.URL.Path == "/v3/auth/tokens" {
 			if r.Method == "POST" {
 				w.Header().Set("X-Subject-Token", "Special-Test-Token")
 				w.Header().Set("Content-Type", "application/json")
@@ -55,28 +55,28 @@ func TestOpenStackCluster(t *testing.T) {
 			} else {
 				w.WriteHeader(http.StatusForbidden)
 			}
-		} else if r.URL.Path == "/services" {
+		} else if r.URL.Path == "/v3/services" {
 			if r.Method == "GET" {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(indentity.ServiceListResponseBody()))
 			} else {
 				w.WriteHeader(http.StatusForbidden)
 			}
-		} else if r.URL.Path == "/projects" {
+		} else if r.URL.Path == "/v3/projects" {
 			if r.Method == "GET" {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(indentity.ProjectListResponseBody()))
 			} else {
 				w.WriteHeader(http.StatusForbidden)
 			}
-		} else if r.URL.Path == "/users" {
+		} else if r.URL.Path == "/v3/users" {
 			if r.Method == "GET" {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(indentity.UserListResponseBody()))
 			} else {
 				w.WriteHeader(http.StatusForbidden)
 			}
-		} else if r.URL.Path == "/groups" {
+		} else if r.URL.Path == "/v3/groups" {
 			if r.Method == "GET" {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(indentity.GroupListResponseBody()))
@@ -281,13 +281,13 @@ func TestOpenStackCluster(t *testing.T) {
 	acc.AssertContainsTaggedFields(t, "openstack_storage_pool", sFields, sTags)
 
 	nFields := map[string]interface{}{
-	   "ip_used": 1,
-		"ip_total": 52,
+	   "ip_used": int64(1),
+		"ip_total": int64(52),
     }
 	nTags := map[string]string{
 		"subnet_cidr":"all",
 		"region":"RegionOne",
-		"project":"unknown",
+		"provider_network": "provider",
 		"network":"provider",
 	}
 
@@ -304,6 +304,29 @@ func TestOpenstackInReal(t *testing.T) {
 		UserDomainID:     "default",
 		ProjectDomainID:  "default",
 		Password:         "Welcome123",
+		Username:         "admin",
+		Region:           "RegionOne",
+		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
+		CpuOvercomitRatio:  "16",
+		RamOvercomitRatio: "1.5",
+		ClientConfig: tls.ClientConfig{
+			InsecureSkipVerify: false,
+			TLSCA:              "test/resources/openstack.crt"},
+	}
+	var acc testutil.Accumulator
+	err := acc.GatherError(plugin.Gather)
+	require.NoError(t, err)
+	fmt.Printf("hello")
+
+}
+func TestOpenstackInRealDevstack(t *testing.T) {
+
+	plugin := &plugin.OpenStack{
+		IdentityEndpoint: "http://192.168.28.55/identity/v3",
+		Project:          "admin",
+		UserDomainID:     "default",
+		ProjectDomainID:  "default",
+		Password:         "secret",
 		Username:         "admin",
 		Region:           "RegionOne",
 		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},

@@ -3,6 +3,7 @@ package networks
 import (
 	"encoding/json"
 	v2 "github.com/influxdata/telegraf/plugins/inputs/openstack/api/networking/v2"
+	"math/big"
 )
 
 type Network struct {
@@ -50,15 +51,14 @@ type IPAvailabilities struct {
 			IPVersion  int    `json:"ip_version"`
 			SubnetID   string `json:"subnet_id"`
 			SubnetName string `json:"subnet_name"`
-			TotalIps   int64  `json:"total_ips"`
-			UsedIps    int    `json:"used_ips"`
+			TotalIps   big.Int  `json:"total_ips"`
+			UsedIps    big.Int    `json:"used_ips"`
 		} `json:"subnet_ip_availability"`
 		ProjectID string `json:"project_id"`
 		TenantID  string `json:"tenant_id"`
-		TotalIps  int    `json:"total_ips"`
-		UsedIps   int    `json:"used_ips"`
+		TotalIps  big.Int    `json:"total_ips"`
+		UsedIps   big.Int    `json:"used_ips"`
 }
-
 
 func List(client *v2.NetworkClient) ([]Network, error) {
 	api, err := declareListNetwork(client.Endpoint, client.Token)
@@ -83,6 +83,7 @@ func NetworkIPAvailabilities(client *v2.NetworkClient) ([]IPAvailabilities, erro
 	}
 	result := NetworkIPAvailabilitiesResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody), &result)
+
 	ipAvail := []IPAvailabilities{}
 	for _, v := range result.NetworkIPAvailabilities{
 		ipAvail = append(ipAvail, v)

@@ -20,6 +20,9 @@ type Service struct {
 func List(client *v2.ComputeClient) ([]Service, error) {
 	api, err := declareListService(client.Endpoint, client.Token)
 	err = client.DoReuest(api)
+	if err != nil {
+		return []Service{},err
+	}
 	if (err != nil) {
 		return nil, err
 	}

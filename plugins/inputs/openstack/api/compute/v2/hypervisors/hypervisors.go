@@ -46,6 +46,9 @@ type Hypervisor struct {
 func List(client *v2.ComputeClient) ([]Hypervisor, error) {
 	api, err := declareListHypervisor(client.Endpoint, client.Token)
 	err = client.DoReuest(api)
+	if err != nil {
+		return []Hypervisor{},err
+	}
 	result := ListHypervisorResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	hypervisors := []Hypervisor{}

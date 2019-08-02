@@ -5,9 +5,11 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/textproto"
+	"strings"
 )
 
 
@@ -43,6 +45,9 @@ func AuthenticatedClient(options AuthOption) (*ProviderClient, error){
 		//Timeout: time.Duration(5), // ondebug comment it
 	}
 	var request *http.Request
+	if !strings.Contains(api.Endpoint , "v3") {
+		api.Endpoint = api.Endpoint+"/v3"
+	}
 	request, err = http.NewRequest(api.Method, api.Endpoint+api.Path, bytes.NewBuffer(api.RequestBody))
 	if (err != nil) {
 		return nil, errors.New("bad request to " + request.URL.Path + " fail to normalized input")
@@ -57,7 +62,7 @@ func AuthenticatedClient(options AuthOption) (*ProviderClient, error){
 	defer resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
 	} else {
-		err = errors.New("RequestBody to " + request.URL.Path + "Respond status code " + string(resp.StatusCode))
+		err = errors.New(fmt.Sprintf("RequestBody to " + request.URL.Path + "Respond status code %d", resp.StatusCode))
 		return nil, err
 	}
 	api.ResponseHeader = resp.Header

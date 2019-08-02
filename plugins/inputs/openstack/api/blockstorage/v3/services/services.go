@@ -21,6 +21,9 @@ type Service struct {
 func List(client *v3.VolumeClient) ([]Service, error) {
 	api, err := declareListService(client.Endpoint, client.Token)
 	err = client.DoReuest(api)
+	if err != nil {
+		return nil, err
+	}
 	result := ListServiceResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	services := []Service{}

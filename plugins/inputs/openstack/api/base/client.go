@@ -3,10 +3,12 @@ package base
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/api/base/request"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/api/identity/v3/authenticator"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -34,12 +36,15 @@ func NewClient(providerClient authenticator.ProviderClient, region string, servi
 	if c.Endpoint == "" {
 		return nil, errors.New("no service " + c.ServiceType + " avalable on region " + region)
 	}
+	if serviceType == "identity" && !strings.Contains(c.Endpoint , "v3") {
+		c.Endpoint = c.Endpoint+"/v3"
+	}
 	c.HTTPClient = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: providerClient.TlsCfg,
 		},
-		Timeout: time.Second * 5,
-		//Timeout: time.Duration(5), // ondebug comment it
+		Timeout: time.Second * 10,
+		//Timeout: time.Duration(10), // ondebug comment it
 	}
 
 	return c, nil
@@ -75,7 +80,7 @@ func (c *Client) DoReuest(api *request.OpenstackAPI) (error) {
 	defer resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
 	} else {
-		err = errors.New("RequestBody to "+request.URL.Path+"Respond status code "+ string(resp.StatusCode))
+		err = errors.New(fmt.Sprintf("RequestBody to "+request.URL.Path+" Respond status code %d", resp.StatusCode))
 		return err
 	}
 	api.ResponseHeader = resp.Header

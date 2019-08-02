@@ -18,7 +18,7 @@ type Capabilities struct {
 	FreeCapacityGb     float64    `json:"free_capacity_gb"`
 	VolumeBackendName  string `json:"volume_backend_name"`
 	//The percentage of the total capacity that is reserved for the internal use by the back end.
-	ReservedPercentage int    `json:"reserved_percentage"`
+	ReservedPercentage float64    `json:"reserved_percentage"`
 	DriverVersion      string `json:"driver_version"`
 	MaxOverSubscriptionRatio string `json:"max_over_subscription_ratio"`
 
@@ -28,14 +28,17 @@ type Capabilities struct {
 	QoSSupport         bool   `json:"QoS_support"`
 	BackendState             string      `json:"backend_state"`
 	ReplicationEnabled       bool        `json:"replication_enabled"`
-	ProvisionedCapacityGb    int         `json:"provisioned_capacity_gb"`
-	AllocatedCapacityGb      int         `json:"allocated_capacity_gb"`
+	ProvisionedCapacityGb    float64         `json:"provisioned_capacity_gb"`
+	AllocatedCapacityGb      float64         `json:"allocated_capacity_gb"`
 
 }
 
 func ListPool(client *v3.VolumeClient) ([]StoragePool, error) {
 	api, err := declareListPool(client.Endpoint, client.Token)
 	err = client.DoReuest(api)
+	if err!= nil{
+		return nil,err
+	}
 	result := ListPoolResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody), &result)
 	pools := []StoragePool{}

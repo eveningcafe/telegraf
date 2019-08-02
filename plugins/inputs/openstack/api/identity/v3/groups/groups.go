@@ -17,6 +17,9 @@ type Group struct {
 func List(client *v3.IdentityClient) ([]Group, error) {
 	api, err := declareListGroup(client.Endpoint, client.Token)
 	err = client.DoReuest(api)
+	if err != nil {
+		return []Group{},err
+	}
 	result := ListGroupResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	groups := []Group{}
