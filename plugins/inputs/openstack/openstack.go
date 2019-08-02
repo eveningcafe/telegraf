@@ -363,7 +363,7 @@ func (o *OpenStack) accumulateIdentity(acc telegraf.Accumulator) error {
 			},tags)
 		}else {
 			acc.AddFields("openstack_identity",fieldMap{
-				"project_enable": 1,
+				"project_enable": 0,
 			},tags)
 		}
 	}
