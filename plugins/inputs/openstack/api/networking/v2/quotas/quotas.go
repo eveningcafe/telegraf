@@ -6,41 +6,51 @@ import (
 )
 
 type Quota struct {
-	RbacPolicy struct {
-		Used     int `json:"used"`
-		Limit    int `json:"limit"`
-		Reserved int `json:"reserved"`
-	} `json:"rbac_policy"`
-	Subnetpool struct {
-		Used     int `json:"used"`
-		Limit    int `json:"limit"`
-		Reserved int `json:"reserved"`
-	} `json:"subnetpool"`
-	SecurityGroupRule struct {
-		Used     int `json:"used"`
-		Limit    int `json:"limit"`
-		Reserved int `json:"reserved"`
-	} `json:"security_group_rule"`
-	SecurityGroup struct {
-		Used     int `json:"used"`
-		Limit    int `json:"limit"`
-		Reserved int `json:"reserved"`
-	} `json:"security_group"`
-	Subnet struct {
-		Used     int `json:"used"`
-		Limit    int `json:"limit"`
-		Reserved int `json:"reserved"`
-	} `json:"subnet"`
-	Port struct {
-		Used     int `json:"used"`
-		Limit    int `json:"limit"`
-		Reserved int `json:"reserved"`
-	} `json:"port"`
 	Network struct {
-		Used     int `json:"used"`
 		Limit    int `json:"limit"`
+		Used     int `json:"used"`
 		Reserved int `json:"reserved"`
 	} `json:"network"`
+	Subnet struct {
+		Limit    int `json:"limit"`
+		Used     int `json:"used"`
+		Reserved int `json:"reserved"`
+	} `json:"subnet"`
+	Subnetpool struct {
+		Limit    int `json:"limit"`
+		Used     int `json:"used"`
+		Reserved int `json:"reserved"`
+	} `json:"subnetpool"`
+	Port struct {
+		Limit    int `json:"limit"`
+		Used     int `json:"used"`
+		Reserved int `json:"reserved"`
+	} `json:"port"`
+	Router struct {
+		Limit    int `json:"limit"`
+		Used     int `json:"used"`
+		Reserved int `json:"reserved"`
+	} `json:"router"`
+	Floatingip struct {
+		Limit    int `json:"limit"`
+		Used     int `json:"used"`
+		Reserved int `json:"reserved"`
+	} `json:"floatingip"`
+	RbacPolicy struct {
+		Limit    int `json:"limit"`
+		Used     int `json:"used"`
+		Reserved int `json:"reserved"`
+	} `json:"rbac_policy"`
+	SecurityGroup struct {
+		Limit    int `json:"limit"`
+		Used     int `json:"used"`
+		Reserved int `json:"reserved"`
+	} `json:"security_group"`
+	SecurityGroupRule struct {
+		Limit    int `json:"limit"`
+		Used     int `json:"used"`
+		Reserved int `json:"reserved"`
+	} `json:"security_group_rule"`
 }
 
 

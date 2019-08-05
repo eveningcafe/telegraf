@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestOpenStackCluster(t *testing.T) {
 	var err error
 	var fakeKeystoneListen net.Listener
@@ -199,11 +198,12 @@ func TestOpenStackCluster(t *testing.T) {
 	defer fakeNeutronServer.Close()
 
 	plugin := &plugin.OpenStack{
-		IdentityEndpoint: fakeKeystoneServer.URL,
-		Region:           "RegionOne",
-		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
-		CpuOvercomitRatio:  "16",
-		RamOvercomitRatio: "1.5",
+		IdentityEndpoint:   fakeKeystoneServer.URL,
+		Cloud:              "my_openstack",
+		Region:             "RegionOne",
+		ServicesGather:     []string{"identity", "volumev3", "compute", "network"},
+		CpuOvercommitRatio: 16.0,
+		MemOvercommitRatio: 1.5,
 		ClientConfig: tls.ClientConfig{
 			InsecureSkipVerify: false,
 			TLSCA:              "test/resources/openstack.crt"},
@@ -212,103 +212,106 @@ func TestOpenStackCluster(t *testing.T) {
 	var acc testutil.Accumulator
 	require.NoError(t, acc.GatherError(plugin.Gather))
 
-
-	//acc.AssertContainsFields(t, "openstack_identity",map[string]interface {}{"api_state":1})
-	//acc.AssertContainsFields(t, "openstack_compute", map[string]interface {}{"api_state":1})
-	//acc.AssertContainsFields(t, "openstack_volumes", map[string]interface {}{"api_state":1})
-	//acc.AssertContainsFields(t, "openstack_network", map[string]interface {}{"api_state":1})
+	acc.AssertContainsFields(t, "openstack_identity",map[string]interface {}{"api_state":1})
+	acc.AssertContainsFields(t, "openstack_compute", map[string]interface {}{"api_state":1})
+	acc.AssertContainsFields(t, "openstack_volumes", map[string]interface {}{"api_state":1})
+	acc.AssertContainsFields(t, "openstack_network", map[string]interface {}{"api_state":1})
 
 	iFields := map[string]interface{}{
 		"num_projects": 1,
 		"num_servives": 7,
-		"num_users":   7,
-		"num_group":  1,
+		"num_users":    7,
+		"num_group":    1,
 	}
 	iTags := map[string]string{
-		"region" : "RegionOne",
+		"cloud":  "my_openstack",
+		"region": "RegionOne",
 	}
 	acc.AssertContainsTaggedFields(t, "openstack_identity", iFields, iTags)
 
 	cFields := map[string]interface{}{
-		"local_disk_usage": float64(0),
-		"memory_mb_total": float64(7976),
-		"memory_mb_used":   float64(512),
-		"running_vms":  0,
-		"vcpus_total": float64(6),
-		"vcpus_used": float64(0),
-		"vcpus_total_overcommit": float64(96),
-		"memory_total_overcommit": float64(11964),
-		"local_disk_avalable": float64(410),
-
+		"local_disk_usage":     float64(0),
+		"memory_mb_total":      float64(7976),
+		"memory_mb_used":       float64(512),
+		"running_vms":          0,
+		"cpus_total":           float64(6),
+		"cpus_used":            float64(0),
+		"cpu_overcommit_ratio": float64(16),
+		"mem_overcommit_ratio": float64(1.5),
+		"local_disk_avalable":  float64(410),
 	}
 	cTags := map[string]string{
 		"hypervisor_host": "compute01",
-		"region" : "RegionOne",
+		"cloud":           "my_openstack",
+		"region":          "RegionOne",
 	}
 	acc.AssertContainsTaggedFields(t, "openstack_compute", cFields, cTags)
 
 	vFields := map[string]interface{}{
-		"snapshot_inUse": 0,
-		"volumes_allocated": 0,
-		"volumes_inUse":   0,
-		"volumes_limit_gb":  1000,
-		"volumes_inUse_gb": 0,
+		"snapshot_inUse":        0,
+		"volumes_allocated":     0,
+		"volumes_inUse":         0,
+		"volumes_limit_gb":      1000,
+		"volumes_inUse_gb":      0,
 		"volummes_allocated_gb": 0,
-		"volumes_limit": 10,
-		"snapshot_limit": 10,
-		"snapshot_allocated": 0,
+		"volumes_limit":         10,
+		"snapshot_limit":        10,
+		"snapshot_allocated":    0,
 	}
 	vTags := map[string]string{
 		"project": "demo",
-		"region" : "RegionOne",
+		"cloud":   "my_openstack",
+		"region":  "RegionOne",
 	}
 
 	acc.AssertContainsTaggedFields(t, "openstack_volumes", vFields, vTags)
 	//
 	sFields := map[string]interface{}{
-		"total_capacity_gb": float64(125.03),
-		"free_capacity_gb": float64(125.03),
+		"total_capacity_gb":       float64(125.03),
+		"free_capacity_gb":        float64(125.03),
 		"allocated_capacity_gb":   float64(0),
-		"provisioned_capacity_gb":  float64(0),
-		"max_over_subscription_ratio": float64(20),
+		"provisioned_capacity_gb": float64(0),
+		"disk_overcommit_ratio":   float64(20),
 	}
 	sTags := map[string]string{
 		"backend_state": "up",
-		"backend_name": "RBD",
-		"region" : "RegionOne",
+		"pool_name":     "controller@ceph#RBD",
+		"region":        "RegionOne",
+		"cloud":"my_openstack",
 	}
 
 	acc.AssertContainsTaggedFields(t, "openstack_storage_pool", sFields, sTags)
 
 	nFields := map[string]interface{}{
-	   "ip_used": int64(1),
+		"ip_used":  int64(1),
 		"ip_total": int64(52),
-    }
+	}
 	nTags := map[string]string{
-		"subnet_cidr":"all",
-		"region":"RegionOne",
+		"subnet_cidr":      "all",
+		"cloud":            "my_openstack",
+		"region":           "RegionOne",
 		"provider_network": "provider",
-		"network":"provider",
+		"network":          "provider",
 	}
 
 	acc.AssertContainsTaggedFields(t, "openstack_network", nFields, nTags)
-
 
 }
 
 func TestOpenstackInReal(t *testing.T) {
 
 	plugin := &plugin.OpenStack{
-		IdentityEndpoint: "https://controller:5000/v3",
-		Project:          "admin",
-		UserDomainID:     "default",
-		ProjectDomainID:  "default",
-		Password:         "Welcome123",
-		Username:         "admin",
-		Region:           "RegionOne",
-		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
-		CpuOvercomitRatio:  "16",
-		RamOvercomitRatio: "1.5",
+		IdentityEndpoint:   "https://controller:5000/v3",
+		Project:            "admin",
+		UserDomainID:       "default",
+		ProjectDomainID:    "default",
+		Password:           "Welcome123",
+		Username:           "admin",
+		Cloud:              "my_openstack",
+		Region:             "RegionOne",
+		ServicesGather:     []string{"identity", "volumev3", "compute", "network"},
+		CpuOvercommitRatio: float64(16),
+		MemOvercommitRatio: float64(1.5),
 		ClientConfig: tls.ClientConfig{
 			InsecureSkipVerify: false,
 			TLSCA:              "test/resources/openstack.crt"},
@@ -316,22 +319,23 @@ func TestOpenstackInReal(t *testing.T) {
 	var acc testutil.Accumulator
 	err := acc.GatherError(plugin.Gather)
 	require.NoError(t, err)
-	fmt.Printf("hello")
 
 }
+
 func TestOpenstackInRealDevstack(t *testing.T) {
 
 	plugin := &plugin.OpenStack{
-		IdentityEndpoint: "http://192.168.28.55/identity/v3",
-		Project:          "admin",
-		UserDomainID:     "default",
-		ProjectDomainID:  "default",
-		Password:         "secret",
-		Username:         "admin",
-		Region:           "RegionOne",
-		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
-		CpuOvercomitRatio:  "16",
-		RamOvercomitRatio: "1.5",
+		IdentityEndpoint:   "http://192.168.28.55/identity",
+		Project:            "admin",
+		UserDomainID:       "default",
+		ProjectDomainID:    "default",
+		Password:           "secret",
+		Username:           "admin",
+		Cloud:              "my_devstack",
+		Region:             "RegionOne",
+		ServicesGather:     []string{"identity", "volumev3", "compute", "network"},
+		CpuOvercommitRatio: float64(16),
+		MemOvercommitRatio: float64(1.5),
 		ClientConfig: tls.ClientConfig{
 			InsecureSkipVerify: true,
 			TLSCA:              "test/resources/openstack.crt"},
