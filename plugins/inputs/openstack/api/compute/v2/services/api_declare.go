@@ -9,17 +9,7 @@ type ListServiceRequest struct {
 }
 
 type ListServiceResponse struct {
-	Services []struct {
-		ID             int    `json:"id"`
-		Binary         string `json:"binary"`
-		DisabledReason string `json:"disabled_reason"`
-		Host           string `json:"host"`
-		State          string `json:"state"`
-		Status         string `json:"status"`
-		UpdatedAt      string `json:"updated_at"`
-		ForcedDown     bool   `json:"forced_down"`
-		Zone           string `json:"zone"`
-	} `json:"services"`
+	Services []Service `json:"services"`
 }
 
 //

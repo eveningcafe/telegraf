@@ -23,7 +23,10 @@ type User struct {
 
 func List(client *v3.IdentityClient) ([]User, error) {
 	api, err := declareListUser(client.Endpoint, client.Token)
-	err = api.DoReuest()
+	err = client.DoReuest(api)
+	if err != nil {
+		return []User{},err
+	}
 	result := ListUserResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody),&result)
 	users := []User{}

@@ -18,7 +18,7 @@ type Snapshot struct {
 
 func List(client *v3.VolumeClient) ([]Snapshot, error) {
 	api, err := declareListSnapshots(client.Endpoint, client.Token)
-	err = api.DoReuest()
+	err = client.DoReuest(api)
 	result := ListSnapshotsResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody), &result)
 	snapshots := []Snapshot{}

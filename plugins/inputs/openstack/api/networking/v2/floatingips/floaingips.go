@@ -49,7 +49,7 @@ type Floatingip struct {
 
 func List(client *v2.NetworkClient) ([]Floatingip, error) {
 	api, err := declareListFloatingIp(client.Endpoint, client.Token)
-	err = api.DoReuest()
+	err = client.DoReuest(api)
 	if err!=nil {
 		return nil, err
 	}

@@ -23,7 +23,7 @@ type Volumes struct {
 }
 func ListVolumes(client *v3.VolumeClient) ([]Volumes, error) {
 	api, err := declareListVolumes(client.Endpoint, client.Token)
-	err = api.DoReuest()
+	err = client.DoReuest(api)
 	result := ListVolumesResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody), &result)
 	volumes := []Volumes{}
