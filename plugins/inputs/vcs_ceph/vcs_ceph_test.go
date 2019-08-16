@@ -1,4 +1,4 @@
-package ceph
+package vcs_ceph
 
 import (
 	"fmt"
@@ -15,6 +15,7 @@ import (
 
 const (
 	epsilon = float64(0.00000001)
+	cluster = "my_ceph"
 )
 
 type expectedResult struct {
@@ -44,7 +45,7 @@ func TestParseOsdDump(t *testing.T) {
 
 func TestDecodeStatus(t *testing.T) {
 	acc := &testutil.Accumulator{}
-	err := decodeStatus(acc, clusterStatusDump)
+	err := decodeStatus(acc, clusterStatusDump, cluster)
 	assert.NoError(t, err)
 
 	for _, r := range cephStatusResults {
@@ -54,7 +55,7 @@ func TestDecodeStatus(t *testing.T) {
 
 func TestDecodeDf(t *testing.T) {
 	acc := &testutil.Accumulator{}
-	err := decodeDf(acc, cephDFDump)
+	err := decodeDf(acc, cephDFDump, cluster)
 	assert.NoError(t, err)
 
 	for _, r := range cephDfResults {
@@ -62,9 +63,18 @@ func TestDecodeDf(t *testing.T) {
 	}
 }
 
+//func TestDecodeOsdDfStats(t *testing.T) {
+//	acc := &testutil.Accumulator{}
+//	err := decodeOsdDfStats(acc, cephOSDDfDump, cluster)
+//	assert.NoError(t, err)
+//	for _, r := range cephDfResults {
+//		acc.AssertContainsTaggedFields(t, r.metric, r.fields, r.tags)
+//	}
+//}
+
 func TestDecodeOSDPoolStats(t *testing.T) {
 	acc := &testutil.Accumulator{}
-	err := decodeOsdPoolStats(acc, cephODSPoolStatsDump)
+	err := decodeOsdPoolStats(acc, cephODSPoolStatsDump, cluster)
 	assert.NoError(t, err)
 
 	for _, r := range cephOSDPoolStatsResults {
@@ -851,6 +861,20 @@ var clusterStatusDump = `
 
 var cephStatusResults = []expectedResult{
 	{
+		metric: "ceph_mon",
+		fields: map[string]interface{}{
+			"mon_list":           "a, b, c",
+			"mons_in_quorum":     "a, b, c",
+			"mons_out_of_quorum": "",
+			"num_mon":            3,
+			"num_in_quorum":      3,
+			"num_out_of_quorum":  0,
+		},
+		tags: map[string]string{
+			"cluster": cluster,
+		},
+	},
+	{
 		metric: "ceph_osdmap",
 		fields: map[string]interface{}{
 			"epoch":            float64(21734),
@@ -861,7 +885,9 @@ var cephStatusResults = []expectedResult{
 			"nearfull":         false,
 			"num_remapped_pgs": float64(0),
 		},
-		tags: map[string]string{},
+		tags: map[string]string{
+			"cluster": cluster,
+		},
 	},
 	{
 		metric: "ceph_pgmap",
@@ -877,8 +903,16 @@ var cephStatusResults = []expectedResult{
 			"op_per_sec":       pf(98),
 			"read_op_per_sec":  float64(322),
 			"write_op_per_sec": float64(1022),
+			"inactive_pgs_ratio": float64(0),
+			"degraded_objects": float64(0),
+			"degraded_total": float64(0),
+			"degraded_ratio": float64(0),
+			"misplaced_objects":  float64(0),
+			"misplaced_ratio":    float64(0),
 		},
-		tags: map[string]string{},
+		tags: map[string]string{
+			"cluster": cluster,
+		},
 	},
 	{
 		metric: "ceph_pgmap_state",
@@ -886,7 +920,8 @@ var cephStatusResults = []expectedResult{
 			"count": float64(2560),
 		},
 		tags: map[string]string{
-			"state": "active+clean",
+			"state":   "active+clean",
+			"cluster": cluster,
 		},
 	},
 	{
@@ -895,7 +930,8 @@ var cephStatusResults = []expectedResult{
 			"count": float64(10),
 		},
 		tags: map[string]string{
-			"state": "active+scrubbing",
+			"state":   "active+scrubbing",
+			"cluster": cluster,
 		},
 	},
 	{
@@ -904,11 +940,15 @@ var cephStatusResults = []expectedResult{
 			"count": float64(5),
 		},
 		tags: map[string]string{
-			"state": "active+backfilling",
+			"state":   "active+backfilling",
+			"cluster": cluster,
 		},
 	},
 }
 
+var cephOSDDfDump = `
+{"nodes":[{"id":0,"device_class":"hdd","name":"osd.0","type":"osd","type_id":0,"crush_weight":7.276688,"depth":2,"pool_weights":{},"reweight":1.000000,"kb":7813300540,"kb_used":71822524,"kb_avail":7741478016,"utilization":0.919234,"var":0.832566,"pgs":32},{"id":1,"device_class":"hdd","name":"osd.1","type":"osd","type_id":0,"crush_weight":7.276688,"depth":2,"pool_weights":{},"reweight":1.000000,"kb":7813300540,"kb_used":132599996,"kb_avail":7680700544,"utilization":1.697106,"var":1.537097,"pgs":40},{"id":2,"device_class":"hdd","name":"osd.2","type":"osd","type_id":0,"crush_weight":7.276688,"depth":2,"pool_weights":{},"reweight":1.000000,"kb":7813300540,"kb_used":54376956,"kb_avail":7758923584,"utilization":0.695954,"var":0.630337,"pgs":24}],"stray":[],"summary":{"total_kb":23439901620,"total_kb_used":258799476,"total_kb_avail":23181102144,"average_utilization":1.104098,"min_var":0.630337,"max_var":1.537097,"dev":0.429113}}
+`
 var cephDFDump = `
 { "stats": { "total_space": 472345880,
       "total_used": 71058504,
@@ -949,7 +989,9 @@ var cephDfResults = []expectedResult{
 			"total_used_bytes":  pf(71058504),
 			"total_avail_bytes": pf(377286864),
 		},
-		tags: map[string]string{},
+		tags: map[string]string{
+			"cluster": cluster,
+		},
 	},
 	{
 		metric: "ceph_pool_usage",
@@ -961,7 +1003,8 @@ var cephDfResults = []expectedResult{
 			"max_avail":    (*float64)(nil),
 		},
 		tags: map[string]string{
-			"name": "data",
+			"name":    "data",
+			"cluster": cluster,
 		},
 	},
 	{
@@ -974,7 +1017,8 @@ var cephDfResults = []expectedResult{
 			"max_avail":    (*float64)(nil),
 		},
 		tags: map[string]string{
-			"name": "metadata",
+			"name":    "metadata",
+			"cluster": cluster,
 		},
 	},
 	{
@@ -987,7 +1031,8 @@ var cephDfResults = []expectedResult{
 			"max_avail":    (*float64)(nil),
 		},
 		tags: map[string]string{
-			"name": "rbd",
+			"name":    "rbd",
+			"cluster": cluster,
 		},
 	},
 	{
@@ -1000,7 +1045,8 @@ var cephDfResults = []expectedResult{
 			"max_avail":    (*float64)(nil),
 		},
 		tags: map[string]string{
-			"name": "test",
+			"name":    "test",
+			"cluster": cluster,
 		},
 	},
 }
@@ -1050,7 +1096,8 @@ var cephOSDPoolStatsResults = []expectedResult{
 			"recovering_keys_per_sec":    float64(0),
 		},
 		tags: map[string]string{
-			"name": "data",
+			"name":    "data",
+			"cluster": cluster,
 		},
 	},
 	{
@@ -1066,7 +1113,8 @@ var cephOSDPoolStatsResults = []expectedResult{
 			"recovering_keys_per_sec":    float64(0),
 		},
 		tags: map[string]string{
-			"name": "pbench",
+			"name":    "pbench",
+			"cluster": cluster,
 		},
 	},
 }
@@ -1074,3 +1122,30 @@ var cephOSDPoolStatsResults = []expectedResult{
 func pf(i float64) *float64 {
 	return &i
 }
+
+//func TestClusterStats(t *testing.T) {
+//
+//	c := &Ceph{
+//		CephBinary:             "/usr/bin/ceph",
+//		Cluster:                "A",
+//		CephUser:               "client.vcs-monitor",
+//		CephConfig:             "/etc/ceph/ceph.conf",
+//		TimeoutExec:            "30s",
+//		GatherAdminSocketStats: false,
+//		GatherClusterStats:     true,
+//	}
+//	c2 := &Ceph{
+//		CephBinary:             "/usr/bin/ceph",
+//		Cluster:                "B",
+//		CephUser:               "client.vcs-monitor",
+//		CephConfig:             "/etc/ceph2/ceph.conf",
+//		TimeoutExec:            "30s",
+//		GatherAdminSocketStats: false,
+//		GatherClusterStats:     true,
+//	}
+//	acc := &testutil.Accumulator{}
+//	err := c.Gather(acc)
+//	require.NoError(t, err)
+//	err = c2.Gather(acc)
+//	require.NoError(t, err)
+//}

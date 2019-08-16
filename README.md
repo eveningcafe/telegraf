@@ -147,7 +147,7 @@ For documentation on the latest development code see the [documentation index][d
 * [bond](./plugins/inputs/bond)
 * [burrow](./plugins/inputs/burrow)
 * [cassandra](./plugins/inputs/cassandra) (deprecated, use [jolokia2](./plugins/inputs/jolokia2))
-* [ceph](./plugins/inputs/ceph)
+* [ceph](plugins/inputs/vcs_ceph)
 * [cgroup](./plugins/inputs/cgroup)
 * [chrony](./plugins/inputs/chrony)
 * [cisco_telemetry_gnmi](./plugins/inputs/cisco_telemetry_gnmi)

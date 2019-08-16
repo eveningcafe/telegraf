@@ -1,7 +1,5 @@
 package indentity
 
-import "github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources"
-
 func CreateTokenResponseBody(keystoneEndpoint string, novaEndpoint string, cinderEndpoint string,neutronEndpoint string ) string {
 	return `
 {
@@ -203,16 +201,11 @@ func ServiceListResponseBody()  string{
 func ProjectListResponseBody() string{
 	return `
 {
-  "links": {
-    "next": null,
-    "self": "https://controller:5000/v3/projects",
-    "previous": null
-  },
   "projects": [
     {
-      "id": "`+resources.ProjectId+`",
-      "name": "`+resources.ProjectName+`",
-      "domain_id": "`+resources.Domain_id+`",
+      "id": "33b03d1e28404ce68c8cf8c91506465b",
+      "name": "demo",
+      "domain_id": "default",
       "description": "Demo Project",
       "enabled": true,
       "parent_id": "default",
@@ -221,10 +214,27 @@ func ProjectListResponseBody() string{
       "links": {
         "self": "https://controller:5000/v3/projects/33b03d1e28404ce68c8cf8c91506465b"
       }
+    },
+    {
+      "id": "8794dc92419b4c65b43654aa39225aba",
+      "name": "7e985781250646e781010e3a31364590-5c941b4b-a98c-4ebd-8f08-6a121dc",
+      "domain_id": "400621da3fd64d85a935d159eeb17ce2",
+      "description": "Heat stack user project",
+      "enabled": true,
+      "parent_id": "400621da3fd64d85a935d159eeb17ce2",
+      "is_domain": false,
+      "tags": [],
+      "links": {
+        "self": "https://controller:5000/v3/projects/8794dc92419b4c65b43654aa39225aba"
+      }
     }
-  ]
-}
-`
+  ],
+  "links": {
+    "next": null,
+    "self": "https://controller:5000/v3/projects",
+    "previous": null
+  }
+}`
 }
 
 func UserListResponseBody() string{

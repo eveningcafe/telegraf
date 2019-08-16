@@ -12,7 +12,7 @@ import (
 	_ "github.com/influxdata/telegraf/plugins/inputs/bond"
 	_ "github.com/influxdata/telegraf/plugins/inputs/burrow"
 	_ "github.com/influxdata/telegraf/plugins/inputs/cassandra"
-	_ "github.com/influxdata/telegraf/plugins/inputs/ceph"
+	_ "github.com/influxdata/telegraf/plugins/inputs/vcs_ceph"
 	_ "github.com/influxdata/telegraf/plugins/inputs/cgroup"
 	_ "github.com/influxdata/telegraf/plugins/inputs/chrony"
 	_ "github.com/influxdata/telegraf/plugins/inputs/cisco_telemetry_gnmi"
