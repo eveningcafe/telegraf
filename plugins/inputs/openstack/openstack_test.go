@@ -1,12 +1,14 @@
 package openstack_test
 
 import (
+	"fmt"
 	"github.com/influxdata/telegraf/internal/tls"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/blockstorage"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/compute"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/indentity"
 	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/networking"
+	"github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources/placement"
 	"log"
 	"net"
 	"net/http"
@@ -22,18 +24,29 @@ func TestOpenStackCluster(t *testing.T) {
 	var err error
 	var fakeKeystoneListen net.Listener
 	var fakeNovaListen net.Listener
+	var fakePlacementListen net.Listener
 	var fakeCinderListen net.Listener
 	var fakeNeutronListen net.Listener
 	fakeKeystoneEndpoint := "http://127.0.0.1:5000"
 	fakeNovaEndpoint := "http://127.0.0.1:8774"
+	fakePlacementEndpoint := "http://127.0.0.1:8778"
 	fakeCinderEndpoint := "http://127.0.0.1:8776"
 	fakeNeutronEndpoint := "http://127.0.0.1:9696"
 
 	//try to listen on server which run unit test
 	fakeKeystoneListen, err = net.Listen("tcp", fakeKeystoneEndpoint[7:])
 	fakeNovaListen, err = net.Listen("tcp", fakeNovaEndpoint[7:])
+	fakePlacementListen, err = net.Listen("tcp", fakePlacementEndpoint[7:])
 	fakeCinderListen, err = net.Listen("tcp", fakeCinderEndpoint[7:])
 	fakeNeutronListen, err = net.Listen("tcp", fakeNeutronEndpoint[7:])
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer fakeKeystoneListen.Close()
+	defer fakeNovaListen.Close()
+	defer fakeCinderListen.Close()
+	defer fakeNeutronListen.Close()
+	defer fakePlacementListen.Close()
 
 	if err != nil {
 		log.Fatal(err)
@@ -48,6 +61,7 @@ func TestOpenStackCluster(t *testing.T) {
 					indentity.CreateTokenResponseBody(
 						fakeKeystoneEndpoint,
 						fakeNovaEndpoint,
+						fakePlacementEndpoint,
 						fakeCinderEndpoint,
 						fakeNeutronEndpoint)))
 			} else {
@@ -120,6 +134,38 @@ func TestOpenStackCluster(t *testing.T) {
 	fakeNovaServer.Start()
 	defer fakeNovaServer.Close()
 
+	// placement
+	fakePlacementServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/resource_providers" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(placement.ListResourcesProviderResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else if r.URL.Path == "/resource_providers/"+resources.HypervisorID+"/inventories" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(placement.GetResourcesInventoriesResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+
+		} else if r.URL.Path == "/resource_providers/"+resources.HypervisorID+"/usages" {
+			if r.Method == "GET" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(placement.GetResourcesUsagesResponseBody()))
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+			}
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	fakePlacementServer.Listener = fakePlacementListen
+	fakePlacementServer.Start()
+	defer fakePlacementServer.Close()
+
 	fakeCinderServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/os-services" {
 			if r.Method == "GET" {
@@ -142,11 +188,11 @@ func TestOpenStackCluster(t *testing.T) {
 			} else {
 				w.WriteHeader(http.StatusForbidden)
 			}
-
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
+
 	fakeCinderServer.Listener = fakeCinderListen
 	fakeCinderServer.Start()
 	defer fakeCinderServer.Close()
@@ -197,12 +243,17 @@ func TestOpenStackCluster(t *testing.T) {
 	defer fakeNeutronServer.Close()
 
 	plugin := &plugin.OpenStack{
-		IdentityEndpoint:   fakeKeystoneServer.URL,
-		Cloud:              "my_openstack",
-		Region:             "RegionOne",
-		ServicesGather:     []string{"identity", "volumev3", "compute", "network"},
-		CpuOvercommitRatio: 16.0,
-		MemOvercommitRatio: 1.5,
+		IdentityEndpoint: fakeKeystoneServer.URL,
+		Cloud:            "my_openstack",
+		Region:           "RegionOne",
+		ServicesGather: []string{
+			"identity",
+			"volumev3",
+			"network",
+			"compute",
+		},
+		ProjectDomainID: "default",
+		UserDomainID:    "default",
 		ClientConfig: tls.ClientConfig{
 			InsecureSkipVerify: false,
 			TLSCA:              "test/resources/openstack.crt"},
@@ -229,64 +280,87 @@ func TestOpenStackCluster(t *testing.T) {
 	acc.AssertContainsTaggedFields(t, "openstack_identity", iFields, iTags)
 
 	cFields := map[string]interface{}{
-		"local_disk_usage":     float64(0),
-		"memory_mb_total":      float64(7976),
-		"memory_mb_used":       float64(512),
-		"running_vms":          0,
-		"cpus_total":           float64(6),
-		"cpus_used":            float64(0),
-		"cpu_overcommit_ratio": float64(16),
+		"memory_mb_used": float64(16384),
 		"mem_overcommit_ratio": float64(1.5),
-		"local_disk_avalable":  float64(410),
+		"memory_mb_total":float64(31785),
+		"running_vms":      2,
+		"cpu_total": float64(32),
+		"disk_overcommit_ratio": float64(1),
+		"cpu_overcommit_ratio": float64(16),
+		"local_disk_reserved": float64(0),
+		"hypervisor_workload":float64(0),
+		"state": "up",
+		"local_disk_usage": float64(0),
+		"local_disk_total": float64(22354),
+		"cpus_used": float64(16),
+		"status": "enabled",
+		"cpu_reserved": float64(0),
+		"memory_mb_reserved": float64(512),
 	}
 	cTags := map[string]string{
-		"hypervisor_host": "compute01",
+		"hypervisor_host": "compute05",
 		"cloud":           "my_openstack",
 		"region":          "RegionOne",
 	}
 	acc.AssertContainsTaggedFields(t, "openstack_compute", cFields, cTags)
 
-	vFields := map[string]interface{}{
-		"snapshot_inUse":        0,
-		"volumes_allocated":     0,
-		"volumes_inUse":         0,
-		"volumes_limit_gb":      1000,
-		"volumes_inUse_gb":      0,
-		"volummes_allocated_gb": 0,
-		"volumes_limit":         10,
-		"snapshot_limit":        10,
-		"snapshot_allocated":    0,
+	qFields := map[string]interface{}{
+		"network_limit":       100,
+		"network_used":        1,
+		"securityGroup_limit": 10,
+		"securityGroup_used":  1,
+		"securityRule_limit":  100,
+		"securityRule_used":   6,
+		"subnet_limit":        100,
+		"subnet_used":         1,
+		"port_limit":          500,
+		"port_used":           1,
+		"floatingIP_limit":    9999,
+		"floatingIP_used":     0,
+
+		"snapshot_inUse":   0,
+		"volumes_inUse":    0,
+		"volumes_limit_gb": 1000,
+		"volumes_inUse_gb": 0,
+		"volumes_limit":    10,
+		"snapshot_limit":   10,
+
+		"cpu_limit":      20,
+		"cpu_used":       0,
+		"ram_limit":      51200,
+		"ram_used":       0,
+		"instance_limit": 10,
+		"instance_used":  0,
 	}
-	vTags := map[string]string{
+	qTags := map[string]string{
 		"project": "demo",
 		"cloud":   "my_openstack",
 		"region":  "RegionOne",
 	}
 
-	acc.AssertContainsTaggedFields(t, "openstack_volumes", vFields, vTags)
-	//
-	sFields := map[string]interface{}{
+	acc.AssertContainsTaggedFields(t, "openstack_quotas", qFields, qTags)
+
+	vsFields := map[string]interface{}{
 		"total_capacity_gb":       float64(125.03),
 		"free_capacity_gb":        float64(125.03),
 		"allocated_capacity_gb":   float64(0),
 		"provisioned_capacity_gb": float64(0),
 		"disk_overcommit_ratio":   float64(20),
 	}
-	sTags := map[string]string{
-		"backend_state": "up",
-		"pool_name":     "controller@ceph#RBD",
-		"region":        "RegionOne",
-		"cloud":"my_openstack",
+	vsTags := map[string]string{
+		"pool_name": "controller@ceph#RBD",
+		"region":    "RegionOne",
+		"cloud":     "my_openstack",
 	}
 
-	acc.AssertContainsTaggedFields(t, "openstack_storage_pool", sFields, sTags)
+	acc.AssertContainsTaggedFields(t, "openstack_volumes", vsFields, vsTags)
 
 	nFields := map[string]interface{}{
 		"ip_used":  int64(1),
 		"ip_total": int64(52),
 	}
 	nTags := map[string]string{
-		"subnet_cidr":      "all",
+		"subnet_cidr":      "192.168.33.0/24",
 		"cloud":            "my_openstack",
 		"region":           "RegionOne",
 		"provider_network": "provider",
@@ -297,28 +371,25 @@ func TestOpenStackCluster(t *testing.T) {
 
 }
 
-//func TestOpenstackInRealOpenstack(t *testing.T) {
-//
-//	plugin := &plugin.OpenStack{
-//		IdentityEndpoint:   "https://controller:5000/v3",
-//		Project:            "admin",
-//		UserDomainID:       "default",
-//		ProjectDomainID:    "default",
-//		Password:           "Welcome123",
-//		Username:           "admin",
-//		Cloud:              "my_openstack",
-//		Region:             "RegionOne",
-//		ServicesGather:     []string{"identity", "volumev3", "compute", "network"},
-//		CpuOvercommitRatio: float64(16),
-//		MemOvercommitRatio: float64(1.5),
-//		ClientConfig: tls.ClientConfig{
-//			InsecureSkipVerify: false,
-//			TLSCA:              "test/resources/openstack.crt"},
-//	}
-//	var acc testutil.Accumulator
-//	err := acc.GatherError(plugin.Gather)
-//	require.NoError(t, err)
-//
-//}
 
+func TestOpenstackInRealOpenstack(t *testing.T) {
 
+	plugin := &plugin.OpenStack{
+		IdentityEndpoint:   "https://controller:5000/v3",
+		Project:            "admin",
+		UserDomainID:       "default",
+		ProjectDomainID:    "default",
+		Password:           "Welcome123",
+		Username:           "admin",
+		Cloud:              "my_openstack",
+		Region:             "RegionOne",
+		ServicesGather:     []string{"identity", "volumev3", "compute", "network"},
+		ClientConfig: tls.ClientConfig{
+			InsecureSkipVerify: false,
+			TLSCA:              "test/resources/openstack.crt"},
+	}
+	var acc testutil.Accumulator
+	err := acc.GatherError(plugin.Gather)
+	require.NoError(t, err)
+
+}

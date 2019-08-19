@@ -14,6 +14,8 @@ type ListPoolResponse struct {
 		Capabilities Capabilities
 	} `json:"pools"`
 }
+
+
 //
 func declareListPool(endpoint string, token string) (*request.OpenstackAPI, error) {
 	req := ListPoolRequest{}

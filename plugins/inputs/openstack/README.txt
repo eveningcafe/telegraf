@@ -6,4 +6,4 @@ Here is it's flows:
 
 ## Metric:
 
-... About more than 50 metrics, you can get it when run unit test. I'm too lazy to list it here.
+... About more than 100 metrics, you can get it when run unit test. I'm too lazy to list it here.

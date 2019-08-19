@@ -1,8 +1,6 @@
 package indentity
 
-import "github.com/influxdata/telegraf/plugins/inputs/openstack/test/resources"
-
-func CreateTokenResponseBody(keystoneEndpoint string, novaEndpoint string, cinderEndpoint string,neutronEndpoint string ) string {
+func CreateTokenResponseBody(keystoneEndpoint string, novaEndpoint string, placementEndpoint string,cinderEndpoint string,neutronEndpoint string ) string {
 	return `
 {
   "token": {
@@ -134,6 +132,34 @@ func CreateTokenResponseBody(keystoneEndpoint string, novaEndpoint string, cinde
       {
         "endpoints": [
           {
+            "id": "07b8ec57044f4e80a89038331b644e17",
+            "interface": "internal",
+            "region_id": "RegionOne",
+            "url": "`+placementEndpoint+`",
+            "region": "RegionOne"
+          },
+          {
+            "id": "8a96a73bfe9343a4a511fa72061673d7",
+            "interface": "public",
+            "region_id": "RegionOne",
+            "url": "`+placementEndpoint+`",
+            "region": "RegionOne"
+          },
+          {
+            "id": "c971e29563e94ca186e41691f1a5b43d",
+            "interface": "admin",
+            "region_id": "RegionOne",
+            "url": "`+placementEndpoint+`",
+            "region": "RegionOne"
+          }
+        ],
+        "id": "68fc9e41339a45e68ea424e148d86e43",
+        "type": "placement",
+        "name": "placement"
+      },
+      {
+        "endpoints": [
+          {
             "id": "74158342913c456297eccf651e72a01d",
             "interface": "internal",
             "region_id": "RegionOne",
@@ -203,16 +229,11 @@ func ServiceListResponseBody()  string{
 func ProjectListResponseBody() string{
 	return `
 {
-  "links": {
-    "next": null,
-    "self": "https://controller:5000/v3/projects",
-    "previous": null
-  },
   "projects": [
     {
-      "id": "`+resources.ProjectId+`",
-      "name": "`+resources.ProjectName+`",
-      "domain_id": "`+resources.Domain_id+`",
+      "id": "33b03d1e28404ce68c8cf8c91506465b",
+      "name": "demo",
+      "domain_id": "default",
       "description": "Demo Project",
       "enabled": true,
       "parent_id": "default",
@@ -221,10 +242,27 @@ func ProjectListResponseBody() string{
       "links": {
         "self": "https://controller:5000/v3/projects/33b03d1e28404ce68c8cf8c91506465b"
       }
+    },
+    {
+      "id": "8794dc92419b4c65b43654aa39225aba",
+      "name": "7e985781250646e781010e3a31364590-5c941b4b-a98c-4ebd-8f08-6a121dc",
+      "domain_id": "400621da3fd64d85a935d159eeb17ce2",
+      "description": "Heat stack user project",
+      "enabled": true,
+      "parent_id": "400621da3fd64d85a935d159eeb17ce2",
+      "is_domain": false,
+      "tags": [],
+      "links": {
+        "self": "https://controller:5000/v3/projects/8794dc92419b4c65b43654aa39225aba"
+      }
     }
-  ]
-}
-`
+  ],
+  "links": {
+    "next": null,
+    "self": "https://controller:5000/v3/projects",
+    "previous": null
+  }
+}`
 }
 
 func UserListResponseBody() string{

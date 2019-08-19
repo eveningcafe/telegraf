@@ -2,6 +2,7 @@ package hypervisors
 
 import (
 	"encoding/json"
+	"fmt"
 	v2 "github.com/influxdata/telegraf/plugins/inputs/openstack/api/compute/v2"
 )
 // Hypervisor represents a hypervisor in the OpenStack cloud.
@@ -51,6 +52,9 @@ func List(client *v2.ComputeClient) ([]Hypervisor, error) {
 	}
 	result := ListHypervisorResponse{}
 	err = json.Unmarshal([]byte(api.ResponseBody),&result)
+	if err != nil{
+		return nil, fmt.Errorf("unable to get Hypervisors info: request nova api GET %s - %v",api.Path, err)
+	}
 	hypervisors := []Hypervisor{}
 	for _, v := range result.Hypervisors {
 		hypervisors = append(hypervisors, v)}
