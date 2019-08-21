@@ -1,19 +1,16 @@
-package vcs_ceph
+package vcs_ceph_bak
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/influxdata/telegraf"
-	"github.com/influxdata/telegraf/internal"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	"io/ioutil"
 	"log"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 const (
@@ -28,7 +25,6 @@ const (
 type Ceph struct {
 	Cluster                string
 	CephBinary             string
-	PgGoodState            []string
 	EnableMgrMetric        bool
 	OsdPrefix              string
 	MonPrefix              string
@@ -38,7 +34,7 @@ type Ceph struct {
 	CephConfig             string
 	GatherAdminSocketStats bool
 	GatherClusterStats     bool
-	TimeoutExec            internal.Duration `toml:"timeout_exec"`
+	TimeoutExec            string
 }
 
 func (c *Ceph) Description() string {
@@ -52,15 +48,10 @@ var sampleConfig = `
   ## All configuration values are optional, defaults are shown below
   ## ceph cluster name
   cluster = "my_ceph"
-
   ## location of ceph binary
   ceph_binary = "/usr/bin/ceph"
   ## timeout excute for each command like ceph -s, ceph osd pool stat, ceph df and ceph osd df, defaut 30s
   timeout_exec = "30s"
-
-  ## state of pg that plugin will consider in good_state , wrap into metric: ceph_pgmap,cluster=my_ceph num_good_pgs=***
-  pg_good_state = ["active+clean","active+clean+scrubbing", "active+clean+scrubbing+deep"]
-
   ## directory in which to look for socket files
   socket_dir = "/var/run/ceph"
 
@@ -130,35 +121,45 @@ func (c *Ceph) gatherAdminSocketStats(acc telegraf.Accumulator) error {
 	return nil
 }
 
-
-
 func (c *Ceph) gatherClusterStats(acc telegraf.Accumulator) error {
 	jobs := []struct {
 		command string
 		parser  func(telegraf.Accumulator, string, string) error
 	}{
-		{"status", c.decodeStatus},
-		{"df", c.decodeDf},
-		{"osd df", c.decodeOsdDfStats},
-		{"osd pool stats", c.decodeOsdPoolStats},
+		{"status", decodeStatus},
+		{"df", decodeDf},
+		{"osd df", decodeOsdDfStats},
+		{"osd pool stats", decodeOsdPoolStats},
+	}
+	// test if have ceph binary
+	err := exec.Command(c.CephBinary, "--conf", c.CephConfig, "--name", c.CephUser, "version").Run()
+	if err != nil {
+		if (strings.Contains(err.Error(), "status 1")) {
+			return fmt.Errorf("fail to authen ceph cluster , please check %s, %s", c.CephConfig, c.CephUser)
+		}
+		return fmt.Errorf("error running ceph %s", err.Error())
 	}
 	// For each job, execute against the cluster, parse and accumulate the data points
 	for _, job := range jobs {
-		output, err := c.execWithTimeout(job.command)
+		command := job.command
+		output, err := c.exec(c.TimeoutExec, command)
 		if err != nil {
-			if (strings.Contains(err.Error(), "status 1")) {
-				return fmt.Errorf("fail to authenticate ceph cluster , please check %s, %s", c.CephConfig, c.CephUser)
-			}else{
-				return fmt.Errorf("error executing command: %v", err)
+			// if error is timeout bypass
+			if (strings.Contains(err.Error(), "status 124")) {
+				return fmt.Errorf("timeouts %s when excute ceph %s ", c.TimeoutExec, command)
+			} else if (strings.Contains(err.Error(), "status 125")) {
+				return fmt.Errorf("config wrong format of timeout ")
 			}
+			return fmt.Errorf("error executing command: %v", err)
 		}
-		err = job.parser(acc, output,c.Cluster)
+		err = job.parser(acc, output, c.Cluster)
 		if err != nil {
 			return fmt.Errorf("error parsing output: %v", err)
 		}
+		// if all mgr down don't need to excute another
 	}
 
-	return nil
+	return err
 }
 
 func init() {
@@ -167,8 +168,7 @@ func init() {
 		return &Ceph{
 			Cluster:                "my_ceph",
 			CephBinary:             "/usr/bin/ceph",
-			TimeoutExec:            internal.Duration{Duration: time.Second * 30},
-			PgGoodState:            []string{"active+clean","active+clean+scrubbing", "active+clean+scrubbing+deep"},
+			TimeoutExec:            "30s",
 			OsdPrefix:              osdPrefix,
 			MonPrefix:              monPrefix,
 			SocketDir:              "/var/run/ceph",
@@ -316,12 +316,12 @@ func flatten(data interface{}) []*metric {
 }
 
 // exec executes the 'ceph' command with the supplied arguments, returning JSON formatted output
-func (c *Ceph) exec(command string) (string, error) {
-	cmdArgs := []string{"--conf", c.CephConfig, "--name", c.CephUser, "--format", "json"}
+func (c *Ceph) exec(timeout string, command string) (string, error) {
+
+	// run ceph -s, df ... with timeout
+	cmdArgs := []string{timeout, c.CephBinary, "--conf", c.CephConfig, "--name", c.CephUser, "--format", "json"}
 	cmdArgs = append(cmdArgs, strings.Split(command, " ")...)
-
-	cmd := exec.Command(c.CephBinary, cmdArgs...)
-
+	cmd := exec.Command("/usr/bin/timeout", cmdArgs...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
@@ -337,39 +337,6 @@ func (c *Ceph) exec(command string) (string, error) {
 	output = strings.Replace(output, "inf", "0", -1)
 
 	return output, nil
-}
-
-// exec executes the 'ceph' command with the supplied arguments, returning JSON formatted output
-func (c *Ceph) execWithTimeout(command string) (string, error) {
-	cmdArgs := []string{"--conf", c.CephConfig, "--name", c.CephUser, "--format", "json"}
-	cmdArgs = append(cmdArgs, strings.Split(command, " ")...)
-
-
-	// Create a new context and add a timeout to it
-	ctx, cancel := context.WithTimeout(context.Background(), c.TimeoutExec.Duration)
-	defer cancel() // The cancel should be deferred so resources are cleaned up
-
-	// Create the command with our context
-	cmd := exec.CommandContext(ctx, c.CephBinary, cmdArgs...)
-
-	// This time we can simply use Output() to get the result.
-	out, err := cmd.Output()
-
-	// We want to check the context error to see if the timeout was executed.
-	// The error returned by cmd.Output() will be OS specific based on what
-	// happens when a process is killed.
-	if ctx.Err() == context.DeadlineExceeded {
-		return "",fmt.Errorf("Command ceph %v timed out in %s", command, c.TimeoutExec)
-	}
-	// If there's no context error, we know the command completed (or errored).
-	if err != nil {
-		return "",fmt.Errorf("Non-zero exit code: %v", err)
-	}
-	output := string(out)
-	output = strings.Replace(output, "-inf", "0", -1)
-	output = strings.Replace(output, "inf", "0", -1)
-	return output, nil
-
 }
 
 // CephStatus is used to unmarshal "ceph -s" output
@@ -437,6 +404,12 @@ type CephStatus struct {
 		OpPerSec         *float64 `json:"op_per_sec"` // This field is no longer reported in ceph 10 and later
 		ReadOpPerSec     float64  `json:"read_op_per_sec"`
 		WriteOpPerSec    float64  `json:"write_op_per_sec"`
+		InactivePgsRatio float64  `json:"inactive_pgs_ratio"`
+		DegradedObjects  float64  `json:"degraded_objects"`
+		DegradedTotal    float64  `json:"degraded_total"`
+		DegradedRatio    float64  `json:"degraded_ratio"`
+		MisplacedObjects float64  `json:"misplaced_objects"`
+		MisplacedRatio   float64  `json:"misplaced_ratio"`
 	} `json:"pgmap"`
 	Fsmap struct {
 		Epoch  int           `json:"epoch"`
@@ -467,18 +440,18 @@ type CephStatus struct {
 }
 
 // decodeStatus decodes the output of 'ceph -s'
-func (c *Ceph) decodeStatus(acc telegraf.Accumulator, input string, cluster string) error {
+func decodeStatus(acc telegraf.Accumulator, input string, cluster string) error {
 	data := &CephStatus{}
 	if err := json.Unmarshal([]byte(input), data); err != nil {
 		return fmt.Errorf("failed to parse json: '%s': %v", input, err)
 	}
 
 	decoders := []func(telegraf.Accumulator, *CephStatus, string) error{
-		c.decodeStatusHealth,
-		c.decodeStatusMonmap,
-		c.decodeStatusOsdmap,
-		c.decodeStatusPgmap,
-		c.decodeStatusPgmapState,
+		decodeStatusHealth,
+		decodeStatusMonmap,
+		decodeStatusOsdmap,
+		decodeStatusPgmap,
+		decodeStatusPgmapState,
 	}
 
 	for _, decoder := range decoders {
@@ -491,7 +464,7 @@ func (c *Ceph) decodeStatus(acc telegraf.Accumulator, input string, cluster stri
 }
 
 // decodeStatusHealth decodes the health portion of the output of 'ceph status'
-func (c *Ceph)decodeStatusHealth(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
+func decodeStatusHealth(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
 	fields := map[string]interface{}{
 		"status":         data.Health.Status,
 		"overall_status": data.Health.OverallStatus,
@@ -503,7 +476,7 @@ func (c *Ceph)decodeStatusHealth(acc telegraf.Accumulator, data *CephStatus, clu
 }
 
 // decodeStatusOsdmap decodes the OSD map portion of the output of 'ceph -s'
-func (c *Ceph)decodeStatusMonmap(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
+func decodeStatusMonmap(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
 	var mon_list []string
 	var mon_in_quorum []string
 	var mon_out_quorum []string
@@ -543,7 +516,7 @@ func (c *Ceph)decodeStatusMonmap(acc telegraf.Accumulator, data *CephStatus, clu
 }
 
 // decodeStatusOsdmap decodes the OSD map portion of the output of 'ceph -s'
-func (c *Ceph)decodeStatusOsdmap(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
+func decodeStatusOsdmap(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
 	fields := map[string]interface{}{
 		"epoch":            data.OSDMap.OSDMap.Epoch,
 		"num_osds":         data.OSDMap.OSDMap.NumOSDs,
@@ -560,7 +533,7 @@ func (c *Ceph)decodeStatusOsdmap(acc telegraf.Accumulator, data *CephStatus, clu
 }
 
 // decodeStatusPgmap decodes the PG map portion of the output of 'ceph -s'
-func (c *Ceph)decodeStatusPgmap(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
+func decodeStatusPgmap(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
 	fields := map[string]interface{}{
 		"version":            data.PGMap.Version,
 		"num_pgs":            data.PGMap.NumPGs,
@@ -573,30 +546,21 @@ func (c *Ceph)decodeStatusPgmap(acc telegraf.Accumulator, data *CephStatus, clus
 		"op_per_sec":         data.PGMap.OpPerSec, // This field is no longer reported in ceph 10 and later
 		"read_op_per_sec":    data.PGMap.ReadOpPerSec,
 		"write_op_per_sec":   data.PGMap.WriteOpPerSec,
+		"inactive_pgs_ratio": data.PGMap.InactivePgsRatio,
+		"degraded_objects":   data.PGMap.DegradedObjects,
+		"degraded_total":     data.PGMap.DegradedTotal,
+		"degraded_ratio":     data.PGMap.DegradedRatio,
+		"misplaced_objects":  data.PGMap.MisplacedObjects,
+		"misplaced_ratio":    data.PGMap.MisplacedRatio,
 	}
-
-	// find ceph_pgmap,cluster=my_ceph num_pgs_good=***
-	num_pgs_good := float64(0)
-	for _, pgState := range data.PGMap.PGsByState {
-		for _, p := range c.PgGoodState {
-			if p == pgState.StateName {
-				num_pgs_good += pgState.Count
-				break
-			}
-		}
-	}
-	fields["num_pgs_good"]=num_pgs_good
-
 	acc.AddFields("ceph_pgmap", fields, map[string]string{
 		"cluster": cluster,
 	})
-
 	return nil
 }
 
 // decodeStatusPgmapState decodes the PG map state portion of the output of 'ceph -s'
-func (c *Ceph)decodeStatusPgmapState(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
-
+func decodeStatusPgmapState(acc telegraf.Accumulator, data *CephStatus, cluster string) error {
 	for _, pgState := range data.PGMap.PGsByState {
 		tags := map[string]string{
 			"cluster": cluster,
@@ -606,10 +570,7 @@ func (c *Ceph)decodeStatusPgmapState(acc telegraf.Accumulator, data *CephStatus,
 			"count": pgState.Count,
 		}
 		acc.AddFields("ceph_pgmap_state", fields, tags)
-
-
 	}
-
 	return nil
 }
 
@@ -636,7 +597,7 @@ type CephDf struct {
 }
 
 // decodeDf decodes the output of 'ceph df'
-func (c *Ceph)decodeDf(acc telegraf.Accumulator, input string, cluster string) error {
+func decodeDf(acc telegraf.Accumulator, input string, cluster string) error {
 	data := &CephDf{}
 	if err := json.Unmarshal([]byte(input), data); err != nil {
 		return fmt.Errorf("failed to parse json: '%s': %v", input, err)
@@ -724,7 +685,7 @@ type CephOSDDfStats struct {
 }
 
 // decodeOsdPoolStats decodes the output of 'ceph osd pool stats'
-func (c *Ceph)decodeOsdPoolStats(acc telegraf.Accumulator, input string, cluster string) error {
+func decodeOsdPoolStats(acc telegraf.Accumulator, input string, cluster string) error {
 	data := CephOSDPoolStats{}
 	if err := json.Unmarshal([]byte(input), &data); err != nil {
 		return fmt.Errorf("failed to parse json: '%s': %v", input, err)
@@ -753,7 +714,7 @@ func (c *Ceph)decodeOsdPoolStats(acc telegraf.Accumulator, input string, cluster
 }
 
 // decodeOsdPoolStats decodes the output of 'ceph osd df'
-func (c *Ceph) decodeOsdDfStats(acc telegraf.Accumulator, input string, cluster string) error {
+func decodeOsdDfStats(acc telegraf.Accumulator, input string, cluster string) error {
 	data := CephOSDDfStats{}
 	if err := json.Unmarshal([]byte(input), &data); err != nil {
 		return fmt.Errorf("failed to parse json: '%s': %v", input, err)

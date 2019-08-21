@@ -1,6 +1,6 @@
 package indentity
 
-func CreateTokenResponseBody(keystoneEndpoint string, novaEndpoint string, cinderEndpoint string,neutronEndpoint string ) string {
+func CreateTokenResponseBody(keystoneEndpoint string, novaEndpoint string, placementEndpoint string,cinderEndpoint string,neutronEndpoint string ) string {
 	return `
 {
   "token": {
@@ -128,6 +128,34 @@ func CreateTokenResponseBody(keystoneEndpoint string, novaEndpoint string, cinde
         "id": "68fc9e41339a45e68ea424e148d86e43",
         "type": "compute",
         "name": "nova"
+      },
+      {
+        "endpoints": [
+          {
+            "id": "07b8ec57044f4e80a89038331b644e17",
+            "interface": "internal",
+            "region_id": "RegionOne",
+            "url": "`+placementEndpoint+`",
+            "region": "RegionOne"
+          },
+          {
+            "id": "8a96a73bfe9343a4a511fa72061673d7",
+            "interface": "public",
+            "region_id": "RegionOne",
+            "url": "`+placementEndpoint+`",
+            "region": "RegionOne"
+          },
+          {
+            "id": "c971e29563e94ca186e41691f1a5b43d",
+            "interface": "admin",
+            "region_id": "RegionOne",
+            "url": "`+placementEndpoint+`",
+            "region": "RegionOne"
+          }
+        ],
+        "id": "68fc9e41339a45e68ea424e148d86e43",
+        "type": "placement",
+        "name": "placement"
       },
       {
         "endpoints": [

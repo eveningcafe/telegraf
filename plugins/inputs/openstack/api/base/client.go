@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const timeout  = 10
+
 type Client struct {
 	Token       string
 	Endpoint    string
@@ -43,7 +45,7 @@ func NewClient(providerClient authenticator.ProviderClient, region string, servi
 		Transport: &http.Transport{
 			TLSClientConfig: providerClient.TlsCfg,
 		},
-		Timeout: time.Second * 10,
+		Timeout: time.Second * timeout,
 		//Timeout: time.Duration(10), // ondebug comment it
 	}
 

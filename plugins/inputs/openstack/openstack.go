@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/influxdata/telegraf/filter"
 	"github.com/influxdata/telegraf/internal/tls"
-	"github.com/prometheus/common/log"
 	"reflect"
 	"strconv"
 	"sync"
@@ -30,6 +29,8 @@ import (
 	networkingAgent "github.com/influxdata/telegraf/plugins/inputs/openstack/api/networking/v2/agents"
 	networkingNET "github.com/influxdata/telegraf/plugins/inputs/openstack/api/networking/v2/networks"
 	networkingQuotas "github.com/influxdata/telegraf/plugins/inputs/openstack/api/networking/v2/quotas"
+	placement "github.com/influxdata/telegraf/plugins/inputs/openstack/api/placement/v1"
+	computeResourceProvider "github.com/influxdata/telegraf/plugins/inputs/openstack/api/placement/v1/resource_providers"
 )
 
 const (
@@ -59,15 +60,7 @@ var sampleConfig = `
   ## The user's password to authenticate with
   password = "Passw0rd"
   ## Opesntack service type collector
-  services_gather = [
-    "identity",
-    "volumev3",
-    "network",
-    "compute",
-  ]
-  ## there is no way we can get overcommit cpu and ram so It must config as same as the config at nova.conf
-  cpu_overcommit_ratio = 16.0
-  mem_overcommit_ratio = 1.5
+  services_gather = ["identity", "volumev3", "network", "compute"]
   ## Optional TLS Config
   tls_ca = "/etc/telegraf/openstack.crt"
   ## Optional Use TLS but skip chain & host verification
@@ -87,26 +80,25 @@ type networkMap map[string]networkingNET.Network
 // OpenStack is the main structure associated with a collection instance.
 type OpenStack struct {
 	// Configuration variables
-	IdentityEndpoint   string
-	ProjectDomainID    string
-	UserDomainID       string
-	Project            string
-	Username           string
-	Password           string
-	Region             string
-	Cloud              string
-	ServicesGather     []string
-	CpuOvercommitRatio float64
-	MemOvercommitRatio float64
+	IdentityEndpoint string
+	ProjectDomainID  string
+	UserDomainID     string
+	Project          string
+	Username         string
+	Password         string
+	Region           string
+	Cloud            string
+	ServicesGather   []string
 	tls.ClientConfig
 
 	//filter service
 	filter filter.Filter
 	// Locally cached clients
-	identityClient *identity.IdentityClient
-	computeClient  *compute.ComputeClient
-	volumeClient   *blockstorage.VolumeClient
-	networkClient  *networking.NetworkClient
+	identityClient  *identity.IdentityClient
+	computeClient   *compute.ComputeClient
+	placementClient *placement.PlacementClient
+	volumeClient    *blockstorage.VolumeClient
+	networkClient   *networking.NetworkClient
 
 	// Locally cached resources
 	services     serviceMap
@@ -160,6 +152,9 @@ func (o *OpenStack) initialize() error {
 	if o.filter.Match("compute") {
 		if o.computeClient, err = compute.NewComputeV2(*provider, o.Region); err != nil {
 			return fmt.Errorf("unable to create V2 compute client: %v", err)
+		}
+		if o.placementClient, err = placement.NewPlacementClientV1(*provider, o.Region); err != nil {
+			return fmt.Errorf("unable to create V1 placement client: %v", err)
 		}
 	}
 	if o.filter.Match("volumev3") {
@@ -260,48 +255,88 @@ func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) error {
 				fields["agent_state"] = 0
 			}
 			acc.AddFields("openstack_compute", fields, tagMap{
-				"cloud":      o.Cloud,
-				"region":     o.Region,
-				"service":    agent.Binary,
-				"agent_host": agent.Host,
-				"status":     agent.Status,
-				"zone":       agent.Zone,
+				"cloud":        o.Cloud,
+				"region":       o.Region,
+				"service":      agent.Binary,
+				"agent_host":   agent.Host,
+				"agent_status": agent.Status,
+				"zone":         agent.Zone,
 			})
 		}
 	}
 	return err
 }
 
+
 // accumulateStoragePools accumulates statistics about nova hypervisors.
-func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) error {
-	hypervisors, err := computeHypervisors.List(o.computeClient)
+func (o *OpenStack) accumulateComputeHypervisorsPlacement(acc telegraf.Accumulator) error {
+	computeResources, err := computeResourceProvider.List(o.placementClient)
 	if err != nil {
-	} else {
-		//var MemOverCommitRatio float64
-		//var CpuOverCommitRatio float64
-		for _, hypervisor := range hypervisors {
-			//MemOverCommitRatio, err = strconv.ParseFloat(o.MemOvercomitRatio, 64)
-			//CpuOverCommitRatio, err = strconv.ParseFloat(o.CpuOvercomitRatio, 64)
-			fields := fieldMap{
-				"memory_mb_total":      hypervisor.MemoryMb,
-				"memory_mb_used":       hypervisor.MemoryMbUsed,
-				"running_vms":          hypervisor.RunningVms,
-				"cpus_total":           hypervisor.Vcpus,
-				"cpus_used":            hypervisor.VcpusUsed,
-				"cpu_overcommit_ratio": o.CpuOvercommitRatio,
-				"mem_overcommit_ratio": o.MemOvercommitRatio,
-				"local_disk_avalable":  hypervisor.LocalGb,
-				"local_disk_usage":     hypervisor.LocalGbUsed,
-			}
-			acc.AddFields("openstack_compute", fields, tagMap{
-				"hypervisor_host": hypervisor.HypervisorHostname,
-				"cloud":           o.Cloud,
-				"region":          o.Region,
-			})
-		}
+		return err
 	}
+	hypervisors, err := computeHypervisors.List(o.computeClient)
+
+	if err != nil {
+		return err
+	}
+	for _, resource := range computeResources {
+		fields := fieldMap{}
+		tags := tagMap{
+			"hypervisor_host": resource.Name,
+			"cloud":           o.Cloud,
+			"region":          o.Region,
+		}
+
+		for _, hypervisor := range hypervisors {
+			if (hypervisor.HypervisorHostname == resource.Name) {
+				tags["hypervisor_status"] = hypervisor.Status
+				tags["hypervisor_state"] = hypervisor.State
+				fields["running_vms"] = hypervisor.RunningVms
+				fields["hypervisor_workload"] = hypervisor.CurrentWorkload
+			}
+		}
+
+		inventories, err := computeResourceProvider.GetInventories(o.placementClient, resource.UUID)
+		if err != nil {
+			return err
+		} else {
+			fieldsInventories := fieldMap{
+				"memory_mb_total":       inventories.MEMORYMB.Total,
+				"memory_mb_reserved":    inventories.MEMORYMB.Reserved,
+				"mem_overcommit_ratio":  inventories.MEMORYMB.AllocationRatio,
+				"cpu_total":             inventories.VCPU.Total,
+				"cpu_reserved":          inventories.VCPU.Reserved,
+				"cpu_overcommit_ratio":  inventories.VCPU.AllocationRatio,
+				"local_disk_total":      inventories.DISKGB.Total,
+				"local_disk_reserved":   inventories.DISKGB.Reserved,
+				"disk_overcommit_ratio": inventories.DISKGB.AllocationRatio,
+			}
+			for k, v := range fieldsInventories {
+				fields[k] = v
+			}
+		}
+
+		usages, err := computeResourceProvider.GetUsages(o.placementClient, resource.UUID)
+		if err != nil {
+			return err
+		} else {
+			fieldsUsages := fieldMap{
+				"memory_mb_used":   usages.MEMORYMB,
+				"cpus_used":        usages.VCPU,
+				"local_disk_usage": usages.DISKGB,
+			}
+			for k, v := range fieldsUsages {
+				fields[k] = v
+			}
+		}
+
+		// add to metric
+		acc.AddFields("openstack_compute", fields, tags)
+	}
+
 	return err
 }
+
 func (o *OpenStack) accumulateProjectQuotas(acc telegraf.Accumulator) {
 	for _, p := range o.projects {
 		if p.Name == "service" {
@@ -416,20 +451,20 @@ func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) error {
 			} else {
 				fields["agent_state"] = 0
 			}
-			var status string
+			var agent_status string
 			if agent.AdminStateUp == true {
-				status = "enabled"
+				agent_status = "enabled"
 			} else {
-				status = "disabled"
+				agent_status = "disabled"
 			}
 
 			acc.AddFields("openstack_network", fields, tagMap{
-				"cloud":      o.Cloud,
-				"region":     o.Region,
-				"service":    agent.Binary,
-				"agent_host": agent.Host,
-				"status":     status,
-				"zone":       agent.AvailabilityZone,
+				"cloud":        o.Cloud,
+				"region":       o.Region,
+				"service":      agent.Binary,
+				"agent_host":   agent.Host,
+				"agent_status": agent_status,
+				"zone":         agent.AvailabilityZone,
 			})
 		}
 	}
@@ -577,12 +612,12 @@ func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) error {
 				fields["agent_state"] = 0
 			}
 			acc.AddFields("openstack_volumes", fields, tagMap{
-				"cloud":      o.Cloud,
-				"region":     o.Region,
-				"service":    agent.Binary,
-				"agent_host": agent.Host,
-				"status":     agent.Status,
-				"zone":       agent.Zone,
+				"cloud":        o.Cloud,
+				"region":       o.Region,
+				"service":      agent.Binary,
+				"agent_host":   agent.Host,
+				"agent_status": agent.Status,
+				"zone":         agent.Zone,
 			})
 		}
 	}
@@ -603,13 +638,13 @@ func (o *OpenStack) accumulateVolumeStoragePools(acc telegraf.Accumulator) error
 			}
 
 			var overcommit float64
+			// if MaxOverSubscriptionRatio type string
 			if reflect.TypeOf(storagePool.Capabilities.MaxOverSubscriptionRatio).String() == "string" {
 				overcommit, err = strconv.ParseFloat(storagePool.Capabilities.MaxOverSubscriptionRatio.(string), 64)
-			}else {
+			} else {
 				overcommit = storagePool.Capabilities.MaxOverSubscriptionRatio.(float64)
 			}
-			if (err != nil ){ // can't get MaxOverSubscriptionRatio, it can be auto. bypass.
-			    log.Warn("bypass err: %s ",)
+			if (err != nil) { // can't get MaxOverSubscriptionRatio, it can be auto. bypass
 				fields := fieldMap{
 					"total_capacity_gb":       storagePool.Capabilities.TotalCapacityGb,
 					"free_capacity_gb":        storagePool.Capabilities.FreeCapacityGb,
@@ -655,8 +690,8 @@ func (o *OpenStack) getVolumeProjectQuotas(projectID string) (fieldMap, error) {
 			"volumes_inUse":    blockstorageQuotas.Volumes.InUse,
 			"volumes_limit_gb": blockstorageQuotas.Gigabytes.Limit,
 			"volumes_inUse_gb": blockstorageQuotas.Gigabytes.InUse,
-			"snapshot_limit": blockstorageQuotas.Snapshots.Limit,
-			"snapshot_inUse": blockstorageQuotas.Snapshots.InUse,
+			"snapshot_limit":   blockstorageQuotas.Snapshots.Limit,
+			"snapshot_inUse":   blockstorageQuotas.Snapshots.InUse,
 		}
 	}
 	return fields, err
@@ -725,7 +760,8 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 	if o.filter.Match("compute") {
 		o.accumulators = append(o.accumulators,
 			o.accumulateComputeAgents,
-			o.accumulateComputeHypervisors,
+			//o.accumulateComputeHypervisors,
+			o.accumulateComputeHypervisorsPlacement,
 		)
 	}
 
@@ -760,13 +796,11 @@ func (o *OpenStack) Gather(acc telegraf.Accumulator) error {
 func init() {
 	inputs.Add("openstack", func() telegraf.Input {
 		return &OpenStack{
-			Cloud:              "my_openstack",
-			Region:             "RegionOne",
-			UserDomainID:       "default",
-			ProjectDomainID:    "default",
-			ServicesGather:     []string{},
-			MemOvercommitRatio: 1.5,
-			CpuOvercommitRatio: 16.0,
+			Cloud:           "my_openstack",
+			Region:          "RegionOne",
+			UserDomainID:    "default",
+			ProjectDomainID: "default",
+			ServicesGather:  []string{},
 		}
 	})
 }

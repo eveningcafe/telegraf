@@ -1,8 +1,7 @@
-package vcs_ceph
+package vcs_ceph_bak
 
 import (
 	"fmt"
-	"github.com/influxdata/telegraf/internal"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/influxdata/telegraf/testutil"
 	"github.com/stretchr/testify/assert"
@@ -48,10 +46,7 @@ func TestParseOsdDump(t *testing.T) {
 
 func TestDecodeStatus(t *testing.T) {
 	acc := &testutil.Accumulator{}
-	c := Ceph{
-		PgGoodState:            []string{"active+clean","active+clean+scrubbing", "active+clean+scrubbing+deep"},
-	}
-	err := c.decodeStatus(acc, clusterStatusDump, cluster)
+	err := decodeStatus(acc, clusterStatusDump, cluster)
 	assert.NoError(t, err)
 
 	for _, r := range cephStatusResults {
@@ -61,8 +56,7 @@ func TestDecodeStatus(t *testing.T) {
 
 func TestDecodeDf(t *testing.T) {
 	acc := &testutil.Accumulator{}
-	c := Ceph{}
-	err := c.decodeDf(acc, cephDFDump, cluster)
+	err := decodeDf(acc, cephDFDump, cluster)
 	assert.NoError(t, err)
 
 	for _, r := range cephDfResults {
@@ -81,8 +75,7 @@ func TestDecodeDf(t *testing.T) {
 
 func TestDecodeOSDPoolStats(t *testing.T) {
 	acc := &testutil.Accumulator{}
-	c := Ceph{}
-	err := c.decodeOsdPoolStats(acc, cephODSPoolStatsDump, cluster)
+	err := decodeOsdPoolStats(acc, cephODSPoolStatsDump, cluster)
 	assert.NoError(t, err)
 
 	for _, r := range cephOSDPoolStatsResults {
@@ -902,7 +895,6 @@ var cephStatusResults = []expectedResult{
 		fields: map[string]interface{}{
 			"version":          float64(52314277),
 			"num_pgs":          float64(2560),
-			"num_pgs_good":     float64(2560),
 			"data_bytes":       float64(2700031960713),
 			"bytes_used":       float64(7478347665408),
 			"bytes_avail":      float64(9857462382592),
@@ -912,6 +904,12 @@ var cephStatusResults = []expectedResult{
 			"op_per_sec":       pf(98),
 			"read_op_per_sec":  float64(322),
 			"write_op_per_sec": float64(1022),
+			"inactive_pgs_ratio": float64(0),
+			"degraded_objects": float64(0),
+			"degraded_total": float64(0),
+			"degraded_ratio": float64(0),
+			"misplaced_objects":  float64(0),
+			"misplaced_ratio":    float64(0),
 		},
 		tags: map[string]string{
 			"cluster": cluster,
@@ -1142,8 +1140,7 @@ func TestClusterStats(t *testing.T) {
 		Cluster:                "B",
 		CephUser:               "client.vcs-monitor",
 		CephConfig:             "/etc/ceph2/ceph.conf",
-		TimeoutExec:            internal.Duration{Duration: time.Second * 30},
-		PgGoodState:            []string{"active+clean","active+clean+scrubbing", "active+clean+scrubbing+deep","active+clean"},
+		TimeoutExec:            "30s",
 		GatherAdminSocketStats: false,
 		GatherClusterStats:     true,
 	}
