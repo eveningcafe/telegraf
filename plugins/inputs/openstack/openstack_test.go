@@ -280,27 +280,27 @@ func TestOpenStackCluster(t *testing.T) {
 	acc.AssertContainsTaggedFields(t, "openstack_identity", iFields, iTags)
 
 	cFields := map[string]interface{}{
-		"memory_mb_used": float64(16384),
-		"mem_overcommit_ratio": float64(1.5),
-		"memory_mb_total":float64(31785),
-		"running_vms":      2,
-		"cpu_total": float64(32),
+		"memory_used_mb":        float64(16384),
+		"mem_overcommit_ratio":  float64(1.5),
+		"memory_total_mb":       float64(31785),
+		"running_vms":           2,
+		"cpu_total":             float64(32),
 		"disk_overcommit_ratio": float64(1),
-		"cpu_overcommit_ratio": float64(16),
-		"local_disk_reserved": float64(0),
-		"hypervisor_workload":float64(0),
-		"state": "up",
-		"local_disk_usage": float64(0),
-		"local_disk_total": float64(22354),
-		"cpus_used": float64(16),
-		"status": "enabled",
-		"cpu_reserved": float64(0),
-		"memory_mb_reserved": float64(512),
+		"cpu_overcommit_ratio":  float64(16),
+		"local_disk_reserved_gb":   float64(0),
+		"hypervisor_workload":   float64(0),
+		"local_disk_usage_gb":      float64(0),
+		"local_disk_total_gb":      float64(22354),
+		"cpu_used":             float64(16),
+		"cpu_reserved":          float64(0),
+		"memory_reserved_mb":    float64(512),
 	}
 	cTags := map[string]string{
-		"hypervisor_host": "compute05",
-		"cloud":           "my_openstack",
-		"region":          "RegionOne",
+		"hypervisor_host":   "compute05",
+		"hypervisor_state":  "up",
+		"hypervisor_status": "enabled",
+		"cloud":             "my_openstack",
+		"region":            "RegionOne",
 	}
 	acc.AssertContainsTaggedFields(t, "openstack_compute", cFields, cTags)
 
@@ -371,19 +371,18 @@ func TestOpenStackCluster(t *testing.T) {
 
 }
 
-
 func TestOpenstackInRealOpenstack(t *testing.T) {
 
 	plugin := &plugin.OpenStack{
-		IdentityEndpoint:   "https://controller:5000/v3",
-		Project:            "admin",
-		UserDomainID:       "default",
-		ProjectDomainID:    "default",
-		Password:           "Welcome123",
-		Username:           "admin",
-		Cloud:              "my_openstack",
-		Region:             "RegionOne",
-		ServicesGather:     []string{"identity", "volumev3", "compute", "network"},
+		IdentityEndpoint: "https://controller:5000/v3",
+		Project:          "admin",
+		UserDomainID:     "default",
+		ProjectDomainID:  "default",
+		Password:         "Welcome123",
+		Username:         "admin",
+		Cloud:            "my_openstack",
+		Region:           "RegionOne",
+		ServicesGather:   []string{"identity", "volumev3", "compute", "network"},
 		ClientConfig: tls.ClientConfig{
 			InsecureSkipVerify: false,
 			TLSCA:              "test/resources/openstack.crt"},

@@ -62,9 +62,9 @@ var sampleConfig = `
   ## Opesntack service type collector
   services_gather = ["identity", "volumev3", "network", "compute"]
   ## Optional TLS Config
-  tls_ca = "/etc/telegraf/openstack.crt"
+  #tls_ca = "/etc/telegraf/openstack.crt"
   ## Optional Use TLS but skip chain & host verification
-  insecure_skip_verify = false
+  #insecure_skip_verify = false
 `
 
 type tagMap map[string]string
@@ -255,44 +255,18 @@ func (o *OpenStack) accumulateComputeAgents(acc telegraf.Accumulator) error {
 				fields["agent_state"] = 0
 			}
 			acc.AddFields("openstack_compute", fields, tagMap{
-				"cloud":      o.Cloud,
-				"region":     o.Region,
-				"service":    agent.Binary,
-				"agent_host": agent.Host,
-				"status":     agent.Status,
-				"zone":       agent.Zone,
+				"cloud":        o.Cloud,
+				"region":       o.Region,
+				"service":      agent.Binary,
+				"agent_host":   agent.Host,
+				"agent_status": agent.Status,
+				"zone":         agent.Zone,
 			})
 		}
 	}
 	return err
 }
 
-// accumulateStoragePools accumulates statistics about nova hypervisors.
-//func (o *OpenStack) accumulateComputeHypervisors(acc telegraf.Accumulator) error {
-//	hypervisors, err := computeHypervisors.List(o.computeClient)
-//	if err != nil {
-//	} else {
-//		for _, hypervisor := range hypervisors {
-//
-//			fields := fieldMap{
-//				//"memory_mb_used":   hypervisor.MemoryMbUsed,
-//				"running_vms": hypervisor.RunningVms,
-//				//"cpus_used":        hypervisor.VcpusUsed,
-//				//"local_disk_usage": hypervisor.LocalGbUsed,
-//				"load_average": hypervisor.CurrentWorkload,
-//			}
-//
-//			///
-//			acc.AddFields("openstack_compute", fields, tagMap{
-//				"hypervisor_host": hypervisor.HypervisorHostname,
-//				"cloud":           o.Cloud,
-//				"region":          o.Region,
-//			})
-//
-//		}
-//	}
-//	return err
-//}
 
 // accumulateStoragePools accumulates statistics about nova hypervisors.
 func (o *OpenStack) accumulateComputeHypervisorsPlacement(acc telegraf.Accumulator) error {
@@ -307,11 +281,16 @@ func (o *OpenStack) accumulateComputeHypervisorsPlacement(acc telegraf.Accumulat
 	}
 	for _, resource := range computeResources {
 		fields := fieldMap{}
+		tags := tagMap{
+			"hypervisor_host": resource.Name,
+			"cloud":           o.Cloud,
+			"region":          o.Region,
+		}
 
 		for _, hypervisor := range hypervisors {
 			if (hypervisor.HypervisorHostname == resource.Name) {
-				fields["status"] = hypervisor.Status
-				fields["state"] = hypervisor.State
+				tags["hypervisor_status"] = hypervisor.Status
+				tags["hypervisor_state"] = hypervisor.State
 				fields["running_vms"] = hypervisor.RunningVms
 				fields["hypervisor_workload"] = hypervisor.CurrentWorkload
 			}
@@ -320,44 +299,39 @@ func (o *OpenStack) accumulateComputeHypervisorsPlacement(acc telegraf.Accumulat
 		inventories, err := computeResourceProvider.GetInventories(o.placementClient, resource.UUID)
 		if err != nil {
 			return err
-		}else{
+		} else {
 			fieldsInventories := fieldMap{
-				"memory_mb_total":       inventories.MEMORYMB.Total,
-				"memory_mb_reserved":    inventories.MEMORYMB.Reserved,
+				"memory_total_mb":       inventories.MEMORYMB.Total,
+				"memory_reserved_mb":    inventories.MEMORYMB.Reserved,
 				"mem_overcommit_ratio":  inventories.MEMORYMB.AllocationRatio,
 				"cpu_total":             inventories.VCPU.Total,
 				"cpu_reserved":          inventories.VCPU.Reserved,
 				"cpu_overcommit_ratio":  inventories.VCPU.AllocationRatio,
-				"local_disk_total":      inventories.DISKGB.Total,
-				"local_disk_reserved":   inventories.DISKGB.Reserved,
+				"local_disk_total_gb":      inventories.DISKGB.Total,
+				"local_disk_reserved_gb":   inventories.DISKGB.Reserved,
 				"disk_overcommit_ratio": inventories.DISKGB.AllocationRatio,
 			}
-			for k,v := range fieldsInventories{
-				fields[k]=v
+			for k, v := range fieldsInventories {
+				fields[k] = v
 			}
 		}
-
 
 		usages, err := computeResourceProvider.GetUsages(o.placementClient, resource.UUID)
 		if err != nil {
 			return err
-		}else {
+		} else {
 			fieldsUsages := fieldMap{
-				"memory_mb_used":   usages.MEMORYMB,
-				"cpus_used":        usages.VCPU,
-				"local_disk_usage": usages.DISKGB,
+				"memory_used_mb":   usages.MEMORYMB,
+				"cpu_used":        usages.VCPU,
+				"local_disk_usage_gb": usages.DISKGB,
 			}
-			for k,v := range fieldsUsages{
-				fields[k]=v
+			for k, v := range fieldsUsages {
+				fields[k] = v
 			}
 		}
 
 		// add to metric
-		acc.AddFields("openstack_compute", fields, tagMap{
-			"hypervisor_host": resource.Name,
-			"cloud":           o.Cloud,
-			"region":          o.Region,
-		})
+		acc.AddFields("openstack_compute", fields, tags)
 	}
 
 	return err
@@ -477,20 +451,20 @@ func (o *OpenStack) accumulateNetworkAgents(acc telegraf.Accumulator) error {
 			} else {
 				fields["agent_state"] = 0
 			}
-			var status string
+			var agent_status string
 			if agent.AdminStateUp == true {
-				status = "enabled"
+				agent_status = "enabled"
 			} else {
-				status = "disabled"
+				agent_status = "disabled"
 			}
 
 			acc.AddFields("openstack_network", fields, tagMap{
-				"cloud":      o.Cloud,
-				"region":     o.Region,
-				"service":    agent.Binary,
-				"agent_host": agent.Host,
-				"status":     status,
-				"zone":       agent.AvailabilityZone,
+				"cloud":        o.Cloud,
+				"region":       o.Region,
+				"service":      agent.Binary,
+				"agent_host":   agent.Host,
+				"agent_status": agent_status,
+				"zone":         agent.AvailabilityZone,
 			})
 		}
 	}
@@ -638,12 +612,12 @@ func (o *OpenStack) accumulateVolumeAgents(acc telegraf.Accumulator) error {
 				fields["agent_state"] = 0
 			}
 			acc.AddFields("openstack_volumes", fields, tagMap{
-				"cloud":      o.Cloud,
-				"region":     o.Region,
-				"service":    agent.Binary,
-				"agent_host": agent.Host,
-				"status":     agent.Status,
-				"zone":       agent.Zone,
+				"cloud":        o.Cloud,
+				"region":       o.Region,
+				"service":      agent.Binary,
+				"agent_host":   agent.Host,
+				"agent_status": agent.Status,
+				"zone":         agent.Zone,
 			})
 		}
 	}
