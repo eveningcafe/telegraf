@@ -1,0 +1,15 @@
+# Read metrics from Kafka topic(s)
+[[inputs.vcs_kafka]]
+  ## kafka servers
+  brokers = ["localhost:9092"]
+  ## Kafka protocol version
+  version = "v0.10.0.0"
+  ## Regex to filter groups
+  filter_consummer_groups = "g2"
+  ## Regex to filter Topic
+  filter_Topics = ""
+  ## Print detail for all partitions or not
+  detail = true
+  ## Print verbose debug
+  debug = true
+

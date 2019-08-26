@@ -6,7 +6,6 @@ import (
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	"io"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -14,22 +13,20 @@ import (
 )
 
 const (
-	clientID = "kafka-vcs-monitor"
+	monitorclientID = "kafka-vcs-monitor"
 )
 
 var sampleConfig = `
   ## kafka servers
   brokers = ["localhost:9092"]
   ## Kafka protocol version
-  version = "v0.8.2.0"
+  version = "v0.10.0.0"
   ## Regex to filter groups
   filter_consummer_groups = ""
-  ## Topic to consume
-  topic = ""
+  ## Regex to filter Topic
+  filter_topics = ""
   ## Print detail for all partitions or not
-  detail = false
-  ## Comma separated list of partitions to limit offsets to, or all
-  partitions = "all"
+  detail = true
   ## Print verbose debug
   debug = false
 `
@@ -57,6 +54,14 @@ type groupOffset struct {
 	Partition int32
 	Offset    *int64
 	Lag       *int64
+}
+
+type groupMap struct {
+	ClientHost string
+	ClientID   string
+	ConsumerID string
+	Assinment  *sarama.ConsumerGroupMemberAssignment
+	GroupID    string
 }
 
 type tagMap map[string]string
@@ -201,7 +206,7 @@ func kafkaVersion(s string) (sarama.KafkaVersion, error) {
 func saramaConfig(version sarama.KafkaVersion) *sarama.Config {
 	cfg := sarama.NewConfig()
 	cfg.Version = version
-	cfg.ClientID = clientID
+	cfg.ClientID = monitorclientID
 	return cfg
 }
 func (k *Kafka) connect(broker *sarama.Broker) error {
@@ -281,12 +286,13 @@ func (k *Kafka) Gather(acc telegraf.Accumulator) error {
 		return err
 	}
 	brokers := k.client.Brokers()
+
 	if k.Debug {
 		var addrs []string
 		for _, b := range brokers {
 			addrs = append(addrs, b.Addr())
 		}
-		log.Printf("D! Found brokers: %v\n", addrs)
+		fmt.Fprintf(os.Stdout,"D! Found brokers: %v\n", addrs)
 	}
 
 	allGroups, err := k.listGroups(brokers)
@@ -294,7 +300,7 @@ func (k *Kafka) Gather(acc telegraf.Accumulator) error {
 		return err
 	}
 	if k.Debug {
-		log.Printf("D! all groups: %v\n", allGroups)
+		fmt.Fprintf(os.Stdout,"D! all groups: %v\n", allGroups)
 	}
 	groups := []string{}
 	for _, g := range allGroups {
@@ -303,7 +309,7 @@ func (k *Kafka) Gather(acc telegraf.Accumulator) error {
 		}
 	}
 	if k.Debug {
-		log.Printf("D! found groups: %v\n", groups)
+		fmt.Fprintf(os.Stdout,"D! found groups: %v\n", groups)
 	}
 
 	allTopics, err := k.client.Topics()
@@ -311,27 +317,50 @@ func (k *Kafka) Gather(acc telegraf.Accumulator) error {
 		return err
 	}
 	if k.Debug {
-		log.Printf("D! all groups: %v\n", allTopics)
+		fmt.Fprintf(os.Stdout,"D! all topics: %v\n", allTopics)
 	}
 	topics := []string{}
 	for _, t := range allTopics {
 		if k.filterTopics.MatchString(t) {
-			topics = append(groups, t)
+			topics = append(topics, t)
 		}
 	}
 	if k.Debug {
-		log.Printf("D! found groups: %v\n", groups)
+		fmt.Fprintf(os.Stdout,"D! found topic: %v\n", topics)
+	}
+
+	/// get groupmap , each consumer client per topic, partition
+	groupMaps := []groupMap{}
+	var resp *sarama.DescribeGroupsResponse
+	for _, b := range brokers {
+		resp, err = b.DescribeGroups(&sarama.DescribeGroupsRequest{
+			Groups: groups,
+		})
+		for _, g := range resp.Groups {
+			for memberID, member := range g.Members {
+				assinment, err := member.GetMemberAssignment()
+				if err != nil {
+					return fmt.Errorf("can't get assigment of group consumer %s , %s", g.GroupId, memberID)
+				}
+				groupMaps = append(groupMaps,groupMap{
+					GroupID: g.GroupId,
+					ClientHost: member.ClientHost,
+					ClientID:   member.ClientId,
+					ConsumerID: memberID,
+					Assinment:  assinment,
+				})
+			}
+		}
 	}
 
 	topicPartitions := map[string][]int32{}
 	for _, topic := range topics {
-
 		parts, err := k.client.Partitions(topic)
 		if err != nil {
 			return fmt.Errorf("fail to list partitions of topic %s %v", topic, err)
 		}
 		if k.Debug {
-			fmt.Fprintf(os.Stderr, "found partitions=%v for topic=%v\n", parts, topic)
+			fmt.Fprintf(os.Stdout, "found partitions=%v for topic=%v\n", parts, topic)
 		}
 		topicPartitions[topic] = parts
 	}
@@ -339,45 +368,79 @@ func (k *Kafka) Gather(acc telegraf.Accumulator) error {
 	wg := &sync.WaitGroup{}
 	wg.Add(len(groups) * len(topics))
 	for _, grp := range groups {
+		// actually don't need partitions variable, cause is all partition in topic, no config
 		for top, parts := range topicPartitions {
-			go func(grp string, topic string, partitions []int32) {
+			go func(grp string, topic string, partitions []int32, groupMaps []groupMap) {
+				defer wg.Done()
 				if topic == "__consumer_offsets" { // ingor consummer_offsets
-					wg.Done()
+					//wg.Done()
 					return
 				}
 
-				kafkalag, KafkaLagDetail, err := k.getKafkaLag(grp, topic, partitions)
+				kafkaLag, KafkaLagDetail, err := k.getKafkaLag(grp, topic, partitions)
 
-				if err != nil{
-					wg.Done()
+				if err != nil || kafkaLag.consummerGroup == "" {
+					//wg.Done()
 					return
 				}
 				acc.AddFields("kafka_lag", fieldMap{
-					"min_lag": kafkalag.min_lag,
-					"max_lag": kafkalag.max_lag,
+					"min_lag": kafkaLag.min_lag,
+					"max_lag": kafkaLag.max_lag,
+					"lag": kafkaLag.lag,
 				}, tagMap{
-					"group": kafkalag.consummerGroup,
-					"topic": kafkalag.topic,})
+					"group": kafkaLag.consummerGroup,
+					"topic": kafkaLag.topic,
 
-				for _, v := range KafkaLagDetail{
+				})
+
+				for _, v := range KafkaLagDetail {
+					lag_group := v.consummerGroup
+					lag_topic := v.topic
+					lag_partition := v.partition
+					clientID, clientHost, consumerID, err := enrichPatition(groupMaps, lag_group, lag_topic, lag_partition)
+					if err != nil {
+						//wg.Done()
+						return
+					}
 					acc.AddFields("kafka_lag_detail", fieldMap{
 						"current_offset": v.current_offset,
-						"lag": v.lag,
+						"lag":            v.lag,
 					}, tagMap{
-						"group": v.consummerGroup,
-						"topic": v.topic,
-						"partition": v.partition,
+						"group":       lag_group,
+						"topic":       lag_topic,
+						"partition":   strconv.FormatInt(lag_partition, 10),
+						"client_id":   clientID,
+						"client_host": clientHost,
+						"consumer_id": consumerID,
 					})
 				}
 
-				wg.Done()
-			}(grp, top, parts)
+				//wg.Done()
+			}(grp, top, parts, groupMaps)
 		}
 	}
 	wg.Wait()
 
 	return nil
 }
+
+// find consumer of group consum patition-topic
+func enrichPatition(groupMaps []groupMap, group string, topic string, partition int64) (string, string, string, error) {
+	for _,g := range groupMaps {
+		if g.GroupID == group {
+			if t, ok := g.Assinment.Topics[topic]; ok {
+				for _, v := range t {
+					if int64(v) == partition {
+						return g.ClientID, g.ClientHost, g.ConsumerID, nil
+					}
+				}
+			}
+		}
+	}
+	return "", "", "", fmt.Errorf("can't find cosumer_id of topic %s, partition %d", topic, partition)
+
+}
+
 
 type KafkaLag struct {
 	consummerGroup string
@@ -390,7 +453,7 @@ type KafkaLag struct {
 type KafkaLagDetail struct {
 	consummerGroup string
 	topic          string
-	partition      string
+	partition      int64
 	current_offset int64
 	lag            int64
 }
@@ -421,7 +484,7 @@ func (k *Kafka) getKafkaLag(consummerGroup string, top string, parts []int32) (K
 			if k.Detail {
 				kafkaLagDetails = append(kafkaLagDetails, KafkaLagDetail{
 					consummerGroup: consummerGroup,
-					partition:      strconv.Itoa(int(part)),
+					partition:      int64(part),
 					topic:          top,
 					current_offset: gOffset,
 					lag:            gLag,
@@ -435,6 +498,7 @@ func (k *Kafka) getKafkaLag(consummerGroup string, top string, parts []int32) (K
 			topic:          top,
 			min_lag:        partLagMin,
 			max_lag:        partLagMax,
+			lag:            lag,
 		}
 	}
 	return kafkaLag, kafkaLagDetails, nil
@@ -457,6 +521,14 @@ func (k *Kafka) fetchGroupOffset(grp string, top string, part int32) (groupOffse
 	}
 	defer logClose("partition offset manager", pom)
 	groupOff, _ := pom.NextOffset()
+	// test
+	//	a := sarama.ConsumerGroupMemberMetadata
+	//	if grManager, err := sarama.NewConsumerFromClient(grp, k.client); err != nil {
+	//		grManager.
+	//	}
+	defer logClose("offset manager", offsetManager)
+
+	// endtest
 	// we haven't reset it, and it wasn't set before - lag depends on client's config
 	if groupOff == sarama.OffsetNewest || groupOff == sarama.OffsetOldest {
 		return groupOffset{Partition: part}, nil
@@ -488,8 +560,7 @@ func init() {
 		return &Kafka{
 			Brokers: []string{"localhost:9092"},
 			Version: "v0.10.0.0",
-			Detail: true,
-
+			Detail:  true,
 		}
 	})
 }

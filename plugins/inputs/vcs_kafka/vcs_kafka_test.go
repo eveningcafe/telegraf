@@ -21,8 +21,9 @@ func TestClusterStats(t *testing.T) {
 		Debug:   true,
 		Detail:  true,
 		Brokers: []string{"localhost:9092"},
-		Version: "v0.10.0.0",
+		FilterTopics: "black",
 		FilterConsummerGroups: "g2",
+		Version: "v0.10.0.0",
 	}
 	acc := &testutil.Accumulator{}
 	err := k.Gather(acc)
